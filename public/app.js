@@ -88,6 +88,18 @@ async function submitComplaint(e) {
 }
 
 // --- Image Preview ---
+function triggerCamera() {
+  const input = document.getElementById('image');
+  input.setAttribute('capture', 'environment');
+  input.click();
+}
+
+function triggerGallery() {
+  const input = document.getElementById('image');
+  input.removeAttribute('capture');
+  input.click();
+}
+
 function previewImage(e) {
   const file = e.target.files[0];
   if (!file) return;

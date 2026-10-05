@@ -129,10 +129,17 @@
         <div class="form-group">
           <label for="image">Upload Photo (optional)</label>
           <div class="file-upload-area" id="fileUploadArea">
-            <input type="file" id="image" name="image" accept="image/*" capture="environment" onchange="previewImage(event)" hidden>
-            <div class="file-upload-placeholder" id="uploadPlaceholder" onclick="document.getElementById('image').click()">
-              <span class="material-icons-round">cloud_upload</span>
-              <p>Click to upload a photo</p>
+            <input type="file" id="image" name="image" accept="image/*" onchange="previewImage(event)" hidden>
+            <div class="file-upload-placeholder" id="uploadPlaceholder">
+              <p style="margin-bottom: 12px;"><strong>Add a photo of the leakage (optional)</strong></p>
+              <div style="display: flex; gap: 12px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-outline" onclick="triggerCamera()">
+                  <span class="material-icons-round">photo_camera</span> Take Photo
+                </button>
+                <button type="button" class="btn btn-outline" onclick="triggerGallery()">
+                  <span class="material-icons-round">photo_library</span> Choose from Gallery
+                </button>
+              </div>
               <span class="file-hint">JPG, PNG or WebP — max 5MB</span>
             </div>
             <div class="file-preview" id="filePreview" style="display:none;">
