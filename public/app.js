@@ -88,13 +88,23 @@ async function submitComplaint(e) {
 }
 
 // --- Image Preview ---
+function openPhotoChoiceModal() {
+  document.getElementById('photoChoiceModal').style.display = 'flex';
+}
+
+function closePhotoChoiceModal() {
+  document.getElementById('photoChoiceModal').style.display = 'none';
+}
+
 function triggerCamera() {
+  closePhotoChoiceModal();
   const input = document.getElementById('image');
   input.setAttribute('capture', 'environment');
   input.click();
 }
 
 function triggerGallery() {
+  closePhotoChoiceModal();
   const input = document.getElementById('image');
   input.removeAttribute('capture');
   input.click();

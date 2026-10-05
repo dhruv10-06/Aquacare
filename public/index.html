@@ -130,16 +130,9 @@
           <label for="image">Upload Photo (optional)</label>
           <div class="file-upload-area" id="fileUploadArea">
             <input type="file" id="image" name="image" accept="image/*" onchange="previewImage(event)" hidden>
-            <div class="file-upload-placeholder" id="uploadPlaceholder">
-              <p style="margin-bottom: 12px;"><strong>Add a photo of the leakage (optional)</strong></p>
-              <div style="display: flex; gap: 12px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap;">
-                <button type="button" class="btn btn-outline" onclick="triggerCamera()">
-                  <span class="material-icons-round">photo_camera</span> Take Photo
-                </button>
-                <button type="button" class="btn btn-outline" onclick="triggerGallery()">
-                  <span class="material-icons-round">photo_library</span> Choose from Gallery
-                </button>
-              </div>
+            <div class="file-upload-placeholder" id="uploadPlaceholder" onclick="openPhotoChoiceModal()">
+              <span class="material-icons-round" style="font-size: 40px; margin-bottom: 8px;">add_a_photo</span>
+              <p><strong>Add a photo of the leakage (optional)</strong></p>
               <span class="file-hint">JPG, PNG or WebP — max 5MB</span>
             </div>
             <div class="file-preview" id="filePreview" style="display:none;">
@@ -153,6 +146,24 @@
           Submit Complaint
         </button>
       </form>
+    </div>
+
+    <!-- Photo Choice Modal -->
+    <div id="photoChoiceModal" class="modal" style="display:none;">
+      <div class="modal-content form-card" style="max-width: 340px; text-align: center; padding: 24px;">
+        <h2 style="font-size: 1.2rem; margin-bottom: 20px;">Upload Photo</h2>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button type="button" class="btn btn-primary btn-full" onclick="triggerCamera()">
+            <span class="material-icons-round">photo_camera</span> Take Photo
+          </button>
+          <button type="button" class="btn btn-outline btn-full" onclick="triggerGallery()">
+            <span class="material-icons-round">photo_library</span> Choose from Gallery
+          </button>
+          <button type="button" class="btn btn-ghost btn-full" onclick="closePhotoChoiceModal()">
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   </template>
 
