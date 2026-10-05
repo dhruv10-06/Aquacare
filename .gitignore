@@ -1,0 +1,11 @@
+node_modules/
+server/node_modules/
+server/db/aquacare.db
+server/uploads/*
+!server/uploads/.gitkeep
+.env
+*.db
+*.db-shm
+*.db-wal
+server/backup-local/
+dummy.jpg

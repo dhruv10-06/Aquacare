@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AquaCare — Smart Water Leakage Reporting System. Report water leakages, track complaints, and help your community.">
+  <title>AquaCare — Smart Water Leakage Reporting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- NAVIGATION -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="#" class="nav-logo" onclick="navigateTo('home')">
+        <span class="material-icons-round">water_drop</span>
+        <span>AquaCare</span>
+      </a>
+      <div class="nav-links">
+        <a href="#" onclick="navigateTo('home')" data-page="home">Home</a>
+        <a href="#" onclick="navigateTo('report')" data-page="report">Report Issue</a>
+        <a href="#" onclick="navigateTo('track')" data-page="track">Track Complaint</a>
+        <a href="#" onclick="navigateTo('admin-login')" data-page="admin-login" class="nav-admin-btn">Admin</a>
+      </div>
+      <button class="nav-mobile-btn" onclick="toggleMobileMenu()">
+        <span class="material-icons-round">menu</span>
+      </button>
+    </div>
+    <div class="nav-mobile-menu" id="mobileMenu">
+      <a href="#" onclick="navigateTo('home')">Home</a>
+      <a href="#" onclick="navigateTo('report')">Report Issue</a>
+      <a href="#" onclick="navigateTo('track')">Track Complaint</a>
+      <a href="#" onclick="navigateTo('admin-login')">Admin Portal</a>
+    </div>
+  </nav>
+
+  <!-- PAGE CONTAINER -->
+  <main id="app"></main>
+
+  <!-- TEMPLATES -->
+
+  <!-- HOME PAGE -->
+  <template id="tpl-home">
+    <div class="hero">
+      <div class="hero-content">
+        <div class="hero-badge">🏛️ Municipal Water Services</div>
+        <h1>Report Water Leakages.<br><span class="gradient-text">Protect Your Community.</span></h1>
+        <p class="hero-subtitle">AquaCare helps citizens report water leakages, pipe bursts, and water wastage directly to municipal authorities. Track your complaint in real-time.</p>
+        <div class="hero-actions">
+          <button class="btn btn-primary btn-lg" onclick="navigateTo('report')">
+            <span class="material-icons-round">campaign</span>
+            Report a Leakage
+          </button>
+          <button class="btn btn-outline btn-lg" onclick="navigateTo('track')">
+            <span class="material-icons-round">search</span>
+            Track Complaint
+          </button>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="hero-card">
+          <div class="hero-card-icon"><span class="material-icons-round">speed</span></div>
+          <h3>Quick Reporting</h3>
+          <p>Submit a complaint in under 2 minutes</p>
+        </div>
+        <div class="hero-card">
+          <div class="hero-card-icon"><span class="material-icons-round">location_on</span></div>
+          <h3>Location Based</h3>
+          <p>Pinpoint the exact leakage location</p>
+        </div>
+        <div class="hero-card">
+          <div class="hero-card-icon"><span class="material-icons-round">track_changes</span></div>
+          <h3>Real-time Tracking</h3>
+          <p>Follow your complaint from submission to resolution</p>
+        </div>
+      </div>
+    </div>
+
+    <section class="how-it-works">
+      <h2>How It Works</h2>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <h3>Report</h3>
+          <p>Fill in the details about the water leakage and upload a photo.</p>
+        </div>
+        <div class="step-connector"><span class="material-icons-round">arrow_forward</span></div>
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <h3>Get Complaint ID</h3>
+          <p>Receive a unique Complaint ID to track your report's progress.</p>
+        </div>
+        <div class="step-connector"><span class="material-icons-round">arrow_forward</span></div>
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <h3>Resolution</h3>
+          <p>Our maintenance team addresses the issue and updates the status.</p>
+        </div>
+      </div>
+    </section>
+  </template>
+
+  <!-- REPORT FORM -->
+  <template id="tpl-report">
+    <div class="page-container">
+      <div class="page-header">
+        <h1><span class="material-icons-round">campaign</span> Report Water Leakage</h1>
+        <p>Help us fix water issues in your area. Fill in the details below.</p>
+      </div>
+      <form class="form-card" id="reportForm" onsubmit="submitComplaint(event)">
+        <div class="form-group">
+          <label for="name">Full Name <span class="required">*</span></label>
+          <input type="text" id="name" name="name" placeholder="Enter your full name" required>
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone Number <span class="required">*</span></label>
+          <input type="tel" id="phone" name="phone" placeholder="Enter your phone number" required>
+        </div>
+        <div class="form-group">
+          <label for="location">Location / Address <span class="required">*</span></label>
+          <input type="text" id="location" name="location" placeholder="e.g., Near Sector 21 park, Main Road" required>
+        </div>
+        <div class="form-group">
+          <label for="description">Description <span class="required">*</span></label>
+          <textarea id="description" name="description" rows="4" placeholder="Describe the water leakage issue in detail..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="image">Upload Photo (optional)</label>
+          <div class="file-upload-area" id="fileUploadArea">
+            <input type="file" id="image" name="image" accept="image/*" onchange="previewImage(event)" hidden>
+            <div class="file-upload-placeholder" id="uploadPlaceholder" onclick="document.getElementById('image').click()">
+              <span class="material-icons-round">cloud_upload</span>
+              <p>Click to upload a photo</p>
+              <span class="file-hint">JPG, PNG or WebP — max 5MB</span>
+            </div>
+            <div class="file-preview" id="filePreview" style="display:none;">
+              <img id="previewImg" alt="Preview">
+              <button type="button" class="btn btn-sm btn-danger" onclick="clearImage()">Remove</button>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg btn-full" id="submitBtn">
+          <span class="material-icons-round">send</span>
+          Submit Complaint
+        </button>
+      </form>
+    </div>
+  </template>
+
+  <!-- CONFIRMATION -->
+  <template id="tpl-confirmation">
+    <div class="page-container confirmation-page">
+      <div class="confirmation-card">
+        <div class="confirmation-icon">
+          <span class="material-icons-round">check_circle</span>
+        </div>
+        <h1>Complaint Submitted!</h1>
+        <p>Your complaint has been registered successfully. Save this Complaint ID to track your issue:</p>
+        <div class="complaint-id-display" id="confirmationId">—</div>
+        <div class="confirmation-actions">
+          <button class="btn btn-primary" onclick="copyComplaintId()">
+            <span class="material-icons-round">content_copy</span>
+            Copy ID
+          </button>
+          <button class="btn btn-outline" onclick="navigateTo('track')">
+            <span class="material-icons-round">search</span>
+            Track Complaint
+          </button>
+        </div>
+        <button class="btn btn-ghost" onclick="navigateTo('home')">← Back to Home</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- TRACK COMPLAINT -->
+  <template id="tpl-track">
+    <div class="page-container">
+      <div class="page-header">
+        <h1><span class="material-icons-round">search</span> Track Your Complaint</h1>
+        <p>Enter your Complaint ID to check the current status.</p>
+      </div>
+      <div class="form-card track-form">
+        <div class="track-input-group">
+          <input type="text" id="trackInput" placeholder="Enter Complaint ID (e.g., AQ-1A2B3C4D)" class="track-input">
+          <button class="btn btn-primary" onclick="trackComplaint()">
+            <span class="material-icons-round">search</span>
+            Track
+          </button>
+        </div>
+      </div>
+      <div id="trackResult"></div>
+    </div>
+  </template>
+
+  <!-- TRACK RESULT -->
+  <template id="tpl-track-result">
+    <div class="track-result-card">
+      <div class="track-result-header">
+        <div>
+          <span class="track-result-id"></span>
+          <span class="status-badge"></span>
+        </div>
+        <span class="track-result-date"></span>
+      </div>
+      <div class="track-result-body">
+        <div class="track-detail"><strong>Name:</strong> <span class="detail-name"></span></div>
+        <div class="track-detail"><strong>Location:</strong> <span class="detail-location"></span></div>
+        <div class="track-detail"><strong>Description:</strong> <span class="detail-description"></span></div>
+        <div class="track-detail detail-team" style="display:none;"><strong>Assigned Team:</strong> <span class="detail-assigned"></span></div>
+        <div class="track-image-container" style="display:none;">
+          <strong>Photo:</strong>
+          <img class="track-image" alt="Complaint photo">
+        </div>
+      </div>
+      <!-- Progress bar -->
+      <div class="progress-tracker">
+        <div class="progress-step" data-step="Submitted"><div class="progress-dot"></div><span>Submitted</span></div>
+        <div class="progress-line"></div>
+        <div class="progress-step" data-step="Under Review"><div class="progress-dot"></div><span>Under Review</span></div>
+        <div class="progress-line"></div>
+        <div class="progress-step" data-step="Assigned"><div class="progress-dot"></div><span>Assigned</span></div>
+        <div class="progress-line"></div>
+        <div class="progress-step" data-step="In Progress"><div class="progress-dot"></div><span>In Progress</span></div>
+        <div class="progress-line"></div>
+        <div class="progress-step" data-step="Resolved"><div class="progress-dot"></div><span>Resolved</span></div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ADMIN LOGIN -->
+  <template id="tpl-admin-login">
+    <div class="page-container">
+      <div class="login-card">
+        <div class="login-icon">
+          <span class="material-icons-round">admin_panel_settings</span>
+        </div>
+        <h1>Admin Portal</h1>
+        <p>Sign in to manage complaints</p>
+        <form onsubmit="adminLogin(event)">
+          <div class="form-group">
+            <label for="adminUser">Username</label>
+            <input type="text" id="adminUser" placeholder="Enter username" required>
+          </div>
+          <div class="form-group">
+            <label for="adminPass">Password</label>
+            <input type="password" id="adminPass" placeholder="Enter password" required>
+          </div>
+          <div id="loginError" class="error-message" style="display:none;"></div>
+          <button type="submit" class="btn btn-primary btn-lg btn-full">
+            <span class="material-icons-round">login</span>
+            Sign In
+          </button>
+        </form>
+      </div>
+    </div>
+  </template>
+
+  <!-- ADMIN DASHBOARD -->
+  <template id="tpl-dashboard">
+    <div class="dashboard">
+      <div class="dashboard-header">
+        <div>
+          <h1><span class="material-icons-round">dashboard</span> Admin Dashboard</h1>
+          <p>Manage and resolve water leakage complaints</p>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="adminLogout()">
+          <span class="material-icons-round">logout</span> Logout
+        </button>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card stat-total"><div class="stat-value" id="statTotal">—</div><div class="stat-label">Total</div></div>
+        <div class="stat-card stat-submitted"><div class="stat-value" id="statSubmitted">—</div><div class="stat-label">Submitted</div></div>
+        <div class="stat-card stat-review"><div class="stat-value" id="statReview">—</div><div class="stat-label">Under Review</div></div>
+        <div class="stat-card stat-assigned"><div class="stat-value" id="statAssigned">—</div><div class="stat-label">Assigned</div></div>
+        <div class="stat-card stat-progress"><div class="stat-value" id="statProgress">—</div><div class="stat-label">In Progress</div></div>
+        <div class="stat-card stat-resolved"><div class="stat-value" id="statResolved">—</div><div class="stat-label">Resolved</div></div>
+      </div>
+
+      <!-- Filters -->
+      <div class="dashboard-filters">
+        <div class="search-box">
+          <span class="material-icons-round">search</span>
+          <input type="text" id="searchInput" placeholder="Search by ID, name, location..." oninput="debounceSearch()">
+        </div>
+        <select id="statusFilter" onchange="loadComplaints()">
+          <option value="All">All Statuses</option>
+          <option value="Submitted">Submitted</option>
+          <option value="Under Review">Under Review</option>
+          <option value="Assigned">Assigned</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Resolved">Resolved</option>
+        </select>
+      </div>
+
+      <!-- Complaints List -->
+      <div class="complaints-list" id="complaintsList">
+        <p class="loading-text">Loading complaints...</p>
+      </div>
+    </div>
+  </template>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-content">
+      <p>AquaCare — Smart Water Leakage Reporting System</p>
+      <p class="footer-sub">Built as an Engineering Project • 2026</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
