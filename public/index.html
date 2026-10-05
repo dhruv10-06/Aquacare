@@ -129,7 +129,7 @@
         <div class="form-group">
           <label for="image">Upload Photo (optional)</label>
           <div class="file-upload-area" id="fileUploadArea">
-            <input type="file" id="image" name="image" accept="image/*" onchange="previewImage(event)" hidden>
+            <input type="file" id="image" name="image" accept="image/*" capture="environment" onchange="previewImage(event)" hidden>
             <div class="file-upload-placeholder" id="uploadPlaceholder" onclick="document.getElementById('image').click()">
               <span class="material-icons-round">cloud_upload</span>
               <p>Click to upload a photo</p>
@@ -300,6 +300,22 @@
               Update Password
             </button>
           </form>
+        </div>
+      </div>
+      
+      <!-- Delete Complaint Modal -->
+      <div id="deleteComplaintModal" class="modal" style="display:none;">
+        <div class="modal-content form-card">
+          <div class="modal-header">
+            <h2>Delete Complaint</h2>
+            <span class="close-modal" onclick="closeDeleteModal()">&times;</span>
+          </div>
+          <p style="margin-bottom: 20px;">Are you sure you want to permanently delete this complaint?</p>
+          <div id="deleteError" class="error-message" style="display:none;"></div>
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+          </div>
         </div>
       </div>
 

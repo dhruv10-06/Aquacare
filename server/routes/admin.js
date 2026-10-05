@@ -106,6 +106,32 @@ module.exports = function (db) {
     }
   });
 
+  // DELETE /api/admin/complaints/:id — Delete a complaint
+  router.delete('/complaints/:id', authenticateAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const result = await db.execute({
+        sql: 'SELECT * FROM complaints WHERE id = ?',
+        args: [id]
+      });
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Complaint not found.' });
+      }
+
+      await db.execute({
+        sql: 'DELETE FROM complaints WHERE id = ?',
+        args: [id]
+      });
+
+      res.json({ message: 'Complaint deleted successfully.' });
+    } catch (err) {
+      console.error('Error deleting complaint:', err);
+      res.status(500).json({ error: 'Failed to delete complaint.' });
+    }
+  });
+
   // GET /api/admin/stats — Dashboard statistics
   router.get('/stats', authenticateAdmin, async (req, res) => {
     try {

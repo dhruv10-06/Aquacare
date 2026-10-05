@@ -390,6 +390,9 @@ function renderComplaintCard(c) {
         <button class="btn btn-primary btn-sm" onclick="updateComplaint(${c.id}, null, document.getElementById('team-${c.id}').value)">
           <span class="material-icons-round" style="font-size:16px;">save</span> Save
         </button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteComplaint(${c.id})" style="margin-left:auto;">
+          <span class="material-icons-round" style="font-size:16px;">delete</span> Delete
+        </button>
       </div>
     </div>
   `;
@@ -421,6 +424,49 @@ async function updateComplaint(id, status, team) {
     loadComplaints();
   } catch (err) {
     showToast(err.message || 'Failed to update complaint', 'error');
+  }
+}
+
+// --- Dashboard: Delete Complaint ---
+let complaintToDelete = null;
+
+function confirmDeleteComplaint(id) {
+  complaintToDelete = id;
+  document.getElementById('deleteComplaintModal').style.display = 'flex';
+  document.getElementById('deleteError').style.display = 'none';
+  document.getElementById('confirmDeleteBtn').onclick = () => deleteComplaint(id);
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteComplaintModal').style.display = 'none';
+  complaintToDelete = null;
+}
+
+async function deleteComplaint(id) {
+  const errorDiv = document.getElementById('deleteError');
+  const btn = document.getElementById('confirmDeleteBtn');
+  btn.disabled = true;
+  
+  try {
+    const res = await fetch(`${API}/api/admin/complaints/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+
+    if (res.status === 401) { adminLogout(); return; }
+    
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    closeDeleteModal();
+    showToast('Complaint deleted successfully!', 'success');
+    loadStats();
+    loadComplaints();
+  } catch (err) {
+    errorDiv.textContent = err.message || 'Failed to delete complaint.';
+    errorDiv.style.display = 'block';
+  } finally {
+    btn.disabled = false;
   }
 }
 
