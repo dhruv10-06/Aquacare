@@ -55,8 +55,8 @@ async function initializeDatabase() {
     
     console.log('Default admin created — username: admin');
     if (!process.env.ADMIN_SEED_PASSWORD) {
-      console.log(`Generated Admin Password: ${seedPassword}`);
-      console.log('IMPORTANT: Please log in and change this password immediately, or set ADMIN_SEED_PASSWORD in your environment variables.');
+      console.log('IMPORTANT: A secure random password was generated for the admin account.');
+      console.log('Since you did not provide ADMIN_SEED_PASSWORD, you must reset the admin password directly in the database or set ADMIN_SEED_PASSWORD before initializing a new environment.');
     }
   }
 
