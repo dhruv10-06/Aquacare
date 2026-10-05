@@ -245,6 +245,61 @@ function adminLogout() {
   showToast('Logged out.', 'success');
 }
 
+// --- Admin Change Password ---
+function showChangePasswordModal() {
+  document.getElementById('changePasswordModal').style.display = 'flex';
+  document.getElementById('currentPassword').value = '';
+  document.getElementById('newPassword').value = '';
+  document.getElementById('confirmPassword').value = '';
+  document.getElementById('pwdError').style.display = 'none';
+}
+
+function closeChangePasswordModal() {
+  document.getElementById('changePasswordModal').style.display = 'none';
+}
+
+async function changePassword(e) {
+  e.preventDefault();
+  const currentPassword = document.getElementById('currentPassword').value;
+  const newPassword = document.getElementById('newPassword').value;
+  const confirmPassword = document.getElementById('confirmPassword').value;
+  const errorDiv = document.getElementById('pwdError');
+
+  if (newPassword !== confirmPassword) {
+    errorDiv.textContent = 'New passwords do not match.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/api/admin/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorDiv.textContent = data.error;
+      errorDiv.style.display = 'block';
+      if (res.status === 401 && data.error === 'Token expired') {
+        adminLogout();
+      }
+      return;
+    }
+
+    closeChangePasswordModal();
+    showToast('Password changed successfully!', 'success');
+  } catch (err) {
+    errorDiv.textContent = 'Connection error. Please try again.';
+    errorDiv.style.display = 'block';
+  }
+}
+
 // --- Dashboard: Load Stats ---
 async function loadStats() {
   try {

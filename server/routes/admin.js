@@ -130,5 +130,42 @@ module.exports = function (db) {
     }
   });
 
+  // POST /api/admin/change-password
+  router.post('/change-password', authenticateAdmin, async (req, res) => {
+    try {
+      const { currentPassword, newPassword, confirmPassword } = req.body;
+      const adminId = req.admin.id; // from authenticateAdmin middleware
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        return res.status(400).json({ error: 'All fields are required.' });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ error: 'New passwords do not match.' });
+      }
+
+      const result = await db.execute({
+        sql: 'SELECT * FROM admins WHERE id = ?',
+        args: [adminId]
+      });
+      const admin = result.rows[0];
+
+      if (!admin || !bcrypt.compareSync(currentPassword, admin.password_hash)) {
+        return res.status(401).json({ error: 'Incorrect current password.' });
+      }
+
+      const hash = bcrypt.hashSync(newPassword, 10);
+      await db.execute({
+        sql: 'UPDATE admins SET password_hash = ? WHERE id = ?',
+        args: [hash, adminId]
+      });
+
+      res.json({ message: 'Password changed successfully!' });
+    } catch (err) {
+      console.error('Change password error:', err);
+      res.status(500).json({ error: 'Failed to change password.' });
+    }
+  });
+
   return router;
 };
