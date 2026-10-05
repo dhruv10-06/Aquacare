@@ -1,5 +1,6 @@
 const { createClient } = require('@libsql/client');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 let dbClient = null;
 
@@ -45,12 +46,18 @@ async function initializeDatabase() {
   // Seed default admin if none exists
   const adminExists = await db.execute('SELECT COUNT(*) as count FROM admins');
   if (adminExists.rows[0].count === 0) {
-    const hash = bcrypt.hashSync('aq098aq.', 10);
+    const seedPassword = process.env.ADMIN_SEED_PASSWORD || (crypto.randomBytes(8).toString('hex') + 'A1!');
+    const hash = bcrypt.hashSync(seedPassword, 10);
     await db.execute({
       sql: 'INSERT INTO admins (username, password_hash) VALUES (?, ?)',
       args: ['admin', hash]
     });
+    
     console.log('Default admin created — username: admin');
+    if (!process.env.ADMIN_SEED_PASSWORD) {
+      console.log(`Generated Admin Password: ${seedPassword}`);
+      console.log('IMPORTANT: Please log in and change this password immediately, or set ADMIN_SEED_PASSWORD in your environment variables.');
+    }
   }
 
   return db;
