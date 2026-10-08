@@ -6,7 +6,7 @@ const API = ''; // Same origin — no prefix needed
 
 // --- State ---
 let currentPage = 'home';
-let adminToken = localStorage.getItem('aquacare_token') || null;
+let adminToken = sessionStorage.getItem('aquacare_token') || null;
 let lastComplaintId = null;
 let searchTimeout = null;
 
@@ -233,7 +233,7 @@ async function adminLogin(e) {
     }
 
     adminToken = data.token;
-    localStorage.setItem('aquacare_token', adminToken);
+    sessionStorage.setItem('aquacare_token', adminToken);
 
     // Update nav
     const adminLink = document.querySelector('[data-page="admin-login"]');
@@ -253,7 +253,7 @@ async function adminLogin(e) {
 
 function adminLogout() {
   adminToken = null;
-  localStorage.removeItem('aquacare_token');
+  sessionStorage.removeItem('aquacare_token');
 
   // Reset nav
   const adminLink = document.querySelector('[data-page="dashboard"]');
@@ -539,7 +539,6 @@ function showToast(message, type = 'success') {
 
 // --- Init ---
 (function init() {
-  // If admin token exists, update nav link
   if (adminToken) {
     const adminLink = document.querySelector('[data-page="admin-login"]');
     if (adminLink) {
@@ -547,8 +546,9 @@ function showToast(message, type = 'success') {
       adminLink.setAttribute('onclick', "navigateTo('dashboard')");
       adminLink.dataset.page = 'dashboard';
     }
+    navigateTo('dashboard');
+  } else {
+    // Load home page
+    navigateTo('home');
   }
-
-  // Load home page
-  navigateTo('home');
 })();
