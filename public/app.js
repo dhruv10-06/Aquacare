@@ -236,12 +236,12 @@ async function adminLogin(e) {
     sessionStorage.setItem('aquacare_token', adminToken);
 
     // Update nav
-    const adminLink = document.querySelector('[data-page="admin-login"]');
-    if (adminLink) {
-      adminLink.textContent = 'Dashboard';
-      adminLink.setAttribute('onclick', "navigateTo('dashboard')");
-      adminLink.dataset.page = 'dashboard';
-    }
+    const adminLinks = document.querySelectorAll('[data-page="admin-login"]');
+    adminLinks.forEach(link => {
+      link.textContent = 'Dashboard';
+      link.setAttribute('onclick', "navigateTo('dashboard')");
+      link.dataset.page = 'dashboard';
+    });
 
     navigateTo('dashboard');
     showToast('Logged in successfully!', 'success');
@@ -256,12 +256,12 @@ function adminLogout() {
   sessionStorage.removeItem('aquacare_token');
 
   // Reset nav
-  const adminLink = document.querySelector('[data-page="dashboard"]');
-  if (adminLink) {
-    adminLink.textContent = 'Admin';
-    adminLink.setAttribute('onclick', "navigateTo('admin-login')");
-    adminLink.dataset.page = 'admin-login';
-  }
+  const dashboardLinks = document.querySelectorAll('[data-page="dashboard"]');
+  dashboardLinks.forEach(link => {
+    link.textContent = link.classList.contains('nav-admin-btn') ? 'Admin' : 'Admin Portal';
+    link.setAttribute('onclick', "navigateTo('admin-login')");
+    link.dataset.page = 'admin-login';
+  });
 
   navigateTo('home');
   showToast('Logged out.', 'success');
@@ -540,12 +540,12 @@ function showToast(message, type = 'success') {
 // --- Init ---
 (function init() {
   if (adminToken) {
-    const adminLink = document.querySelector('[data-page="admin-login"]');
-    if (adminLink) {
-      adminLink.textContent = 'Dashboard';
-      adminLink.setAttribute('onclick', "navigateTo('dashboard')");
-      adminLink.dataset.page = 'dashboard';
-    }
+    const adminLinks = document.querySelectorAll('[data-page="admin-login"]');
+    adminLinks.forEach(link => {
+      link.textContent = 'Dashboard';
+      link.setAttribute('onclick', "navigateTo('dashboard')");
+      link.dataset.page = 'dashboard';
+    });
     navigateTo('dashboard');
   } else {
     // Load home page
