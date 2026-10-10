@@ -75,6 +75,14 @@ async function submitComplaint(e) {
   const form = document.getElementById('reportForm');
   const formData = new FormData(form);
 
+  // If a photo was captured via webcam on desktop, ensure it is attached
+  if (currentCitizenWebcamFile) {
+    const existingImg = formData.get('image');
+    if (!existingImg || (existingImg instanceof File && existingImg.size === 0)) {
+      formData.set('image', currentCitizenWebcamFile);
+    }
+  }
+
   try {
     const res = await fetch(`${API}/api/complaints`, {
       method: 'POST',
@@ -97,6 +105,232 @@ async function submitComplaint(e) {
   }
 }
 
+// --- Device & Webcam Utilities ---
+function isMobileDevice() {
+  const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+  const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i;
+  if (mobileRegex.test(ua)) return true;
+  if (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /Macintosh/.test(ua)) return true;
+  return false;
+}
+
+// Global Webcam State
+let webcamStream = null;
+let currentWebcamBlob = null;
+let currentWebcamFile = null;
+let currentWebcamDataUrl = null;
+let webcamOnConfirmCallback = null;
+let webcamFallbackInputId = null;
+
+// Citizen Webcam File holder
+let currentCitizenWebcamFile = null;
+
+function dataURItoBlob(dataURI) {
+  try {
+    const parts = dataURI.split(',');
+    const byteString = atob(parts[1]);
+    const mimeString = parts[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeString });
+  } catch (e) {
+    console.error('Error converting dataURI to Blob:', e);
+    return null;
+  }
+}
+
+async function openWebcamModal(options = {}) {
+  webcamOnConfirmCallback = options.onConfirm || null;
+  webcamFallbackInputId = options.fallbackInputId || null;
+
+  const modal = document.getElementById('webcamModal');
+  const video = document.getElementById('webcamVideo');
+  const img = document.getElementById('webcamCapturedImg');
+  const liveControls = document.getElementById('webcamLiveControls');
+  const reviewControls = document.getElementById('webcamReviewControls');
+  const loading = document.getElementById('webcamLoading');
+  const errorBox = document.getElementById('webcamError');
+  const captureBtn = document.getElementById('webcamCaptureBtn');
+
+  if (!modal || !video) return;
+
+  // Reset UI
+  currentWebcamBlob = null;
+  currentWebcamFile = null;
+  currentWebcamDataUrl = null;
+  video.style.display = 'block';
+  img.style.display = 'none';
+  img.src = '';
+  liveControls.style.display = 'flex';
+  reviewControls.style.display = 'none';
+  errorBox.style.display = 'none';
+  loading.style.display = 'flex';
+  if (captureBtn) captureBtn.disabled = true;
+
+  modal.style.display = 'flex';
+
+  // Check getUserMedia support
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    loading.style.display = 'none';
+    showWebcamError('Webcam access is not supported by your browser or connection. Please choose a file instead.');
+    return;
+  }
+
+  try {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+      });
+    } catch (e1) {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    }
+
+    webcamStream = stream;
+    video.srcObject = stream;
+    await video.play();
+
+    loading.style.display = 'none';
+    if (captureBtn) captureBtn.disabled = false;
+  } catch (err) {
+    console.warn('Webcam access error:', err);
+    loading.style.display = 'none';
+    let msg = 'Could not access camera. Please check your camera permissions or choose an image file instead.';
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      msg = 'Camera permission was denied. Please allow camera access in your browser or choose an image file instead.';
+    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      msg = 'No camera device found on your computer. Please select an image file from your computer instead.';
+    }
+    showWebcamError(msg);
+  }
+}
+
+function showWebcamError(msg) {
+  const errorBox = document.getElementById('webcamError');
+  const errorMsg = document.getElementById('webcamErrorMessage');
+  const liveControls = document.getElementById('webcamLiveControls');
+  if (errorMsg) errorMsg.textContent = msg;
+  if (errorBox) errorBox.style.display = 'flex';
+  if (liveControls) liveControls.style.display = 'none';
+}
+
+function stopWebcamStream() {
+  if (webcamStream) {
+    try {
+      webcamStream.getTracks().forEach(track => track.stop());
+    } catch (e) {}
+    webcamStream = null;
+  }
+  const video = document.getElementById('webcamVideo');
+  if (video) video.srcObject = null;
+}
+
+function closeWebcamModal() {
+  stopWebcamStream();
+  const modal = document.getElementById('webcamModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function captureWebcamPhoto() {
+  const video = document.getElementById('webcamVideo');
+  const canvas = document.getElementById('webcamCanvas');
+  const img = document.getElementById('webcamCapturedImg');
+  const liveControls = document.getElementById('webcamLiveControls');
+  const reviewControls = document.getElementById('webcamReviewControls');
+
+  if (!video || !canvas || !img || !video.videoWidth) return;
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  currentWebcamDataUrl = dataUrl;
+  img.src = dataUrl;
+  img.style.display = 'block';
+  video.style.display = 'none';
+
+  currentWebcamBlob = dataURItoBlob(dataUrl);
+  if (currentWebcamBlob) {
+    currentWebcamFile = new File([currentWebcamBlob], `webcam-${Date.now()}.jpg`, { type: 'image/jpeg' });
+  }
+
+  liveControls.style.display = 'none';
+  reviewControls.style.display = 'flex';
+}
+
+function retakeWebcamPhoto() {
+  const video = document.getElementById('webcamVideo');
+  const img = document.getElementById('webcamCapturedImg');
+  const liveControls = document.getElementById('webcamLiveControls');
+  const reviewControls = document.getElementById('webcamReviewControls');
+
+  currentWebcamBlob = null;
+  currentWebcamFile = null;
+  currentWebcamDataUrl = null;
+
+  if (img) {
+    img.src = '';
+    img.style.display = 'none';
+  }
+  if (video) video.style.display = 'block';
+
+  if (liveControls) liveControls.style.display = 'flex';
+  if (reviewControls) reviewControls.style.display = 'none';
+}
+
+function confirmWebcamPhoto() {
+  if (!currentWebcamFile && currentWebcamDataUrl) {
+    const blob = dataURItoBlob(currentWebcamDataUrl);
+    if (blob) {
+      currentWebcamBlob = blob;
+      currentWebcamFile = new File([blob], `webcam-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    }
+  }
+
+  if (currentWebcamFile && webcamOnConfirmCallback) {
+    webcamOnConfirmCallback(currentWebcamFile, currentWebcamDataUrl);
+  }
+
+  closeWebcamModal();
+}
+
+function fallbackToFileInput() {
+  const fallbackId = webcamFallbackInputId;
+  closeWebcamModal();
+  if (fallbackId) {
+    const input = document.getElementById(fallbackId);
+    if (input) {
+      input.removeAttribute('capture');
+      input.click();
+    }
+  }
+}
+
+function handleCitizenWebcamCapture(file, dataUrl) {
+  currentCitizenWebcamFile = file;
+  const input = document.getElementById('image');
+  if (input) {
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+    } catch (e) {
+      console.warn('DataTransfer not supported:', e);
+    }
+  }
+  const previewImg = document.getElementById('previewImg');
+  if (previewImg) previewImg.src = dataUrl;
+  const filePreview = document.getElementById('filePreview');
+  if (filePreview) filePreview.style.display = 'block';
+  const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+  if (uploadPlaceholder) uploadPlaceholder.style.display = 'none';
+}
+
 // --- Image Preview ---
 function openPhotoChoiceModal() {
   document.getElementById('photoChoiceModal').style.display = 'flex';
@@ -109,18 +343,33 @@ function closePhotoChoiceModal() {
 function triggerCamera() {
   closePhotoChoiceModal();
   const input = document.getElementById('image');
-  input.setAttribute('capture', 'environment');
-  input.click();
+  if (!input) return;
+
+  if (isMobileDevice()) {
+    // Mobile flow: strictly unchanged
+    input.setAttribute('capture', 'environment');
+    input.click();
+    return;
+  }
+
+  // Desktop / Laptop flow: open webcam
+  openWebcamModal({
+    fallbackInputId: 'image',
+    onConfirm: handleCitizenWebcamCapture
+  });
 }
 
 function triggerGallery() {
   closePhotoChoiceModal();
   const input = document.getElementById('image');
-  input.removeAttribute('capture');
-  input.click();
+  if (input) {
+    input.removeAttribute('capture');
+    input.click();
+  }
 }
 
 function previewImage(e) {
+  currentCitizenWebcamFile = null;
   const file = e.target.files[0];
   if (!file) return;
 
@@ -134,10 +383,25 @@ function previewImage(e) {
 }
 
 function clearImage() {
-  document.getElementById('image').value = '';
+  currentCitizenWebcamFile = null;
+  const input = document.getElementById('image');
+  if (input) {
+    input.value = '';
+    input.removeAttribute('capture');
+  }
   document.getElementById('filePreview').style.display = 'none';
   document.getElementById('uploadPlaceholder').style.display = 'block';
 }
+
+// Expose shared utilities globally
+window.isMobileDevice = isMobileDevice;
+window.openWebcamModal = openWebcamModal;
+window.closeWebcamModal = closeWebcamModal;
+window.captureWebcamPhoto = captureWebcamPhoto;
+window.retakeWebcamPhoto = retakeWebcamPhoto;
+window.confirmWebcamPhoto = confirmWebcamPhoto;
+window.fallbackToFileInput = fallbackToFileInput;
+window.handleCitizenWebcamCapture = handleCitizenWebcamCapture;
 
 // --- Copy Complaint ID ---
 function copyComplaintId() {

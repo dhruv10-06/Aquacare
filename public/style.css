@@ -1224,6 +1224,42 @@ img { max-width: 100%; display: block; }
 }
 .close-modal:hover { background: var(--c-danger-bg); color: var(--c-danger); }
 
+/* Webcam Modal */
+.webcam-modal-content {
+  max-width: 520px !important;
+}
+.webcam-viewport {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #0b1528;
+  border: 2px solid var(--color-border);
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--sp-4);
+}
+.webcam-viewport video {
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  display: block;
+  object-fit: cover;
+}
+.webcam-viewport img {
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  display: block;
+  object-fit: contain;
+  background: #000;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── 21. WORKERS MODAL INTERNALS ────────────────────────────── */
 /* Add Worker form — inline grid */
 #workersModal .form-card > div:first-of-type form,

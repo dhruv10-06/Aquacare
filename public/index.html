@@ -635,6 +635,59 @@
     </div>
   </footer>
 
+  <!-- DESKTOP WEBCAM CAPTURE MODAL -->
+  <div id="webcamModal" class="modal webcam-modal" style="display: none; z-index: 1200;" onclick="if(event.target === this) closeWebcamModal()">
+    <div class="modal-content form-card webcam-modal-content" style="max-width: 520px; padding: 24px;">
+      <div class="modal-header" style="margin-bottom: 16px;">
+        <h2 style="font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
+          <span class="material-icons-round" style="color: var(--color-primary);">videocam</span>
+          Take Photo with Webcam
+        </h2>
+        <span class="close-modal" onclick="closeWebcamModal()">&times;</span>
+      </div>
+
+      <div class="webcam-viewport" style="position: relative; width: 100%; border-radius: var(--radius-sm); overflow: hidden; background: #0b1528; border: 2px solid var(--color-border); min-height: 260px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+        <video id="webcamVideo" autoplay playsinline muted style="width: 100%; height: auto; max-height: 360px; display: block; object-fit: cover;"></video>
+        <img id="webcamCapturedImg" alt="Captured Photo" style="width: 100%; height: auto; max-height: 360px; display: none; object-fit: contain; background: #000;">
+        <canvas id="webcamCanvas" style="display: none;"></canvas>
+
+        <div id="webcamLoading" style="position: absolute; display: none; flex-direction: column; align-items: center; justify-content: center; color: #fff; gap: 8px;">
+          <span class="material-icons-round" style="font-size: 32px; animation: spin 1s linear infinite;">sync</span>
+          <p style="font-size: 14px; margin: 0;">Connecting to camera...</p>
+        </div>
+
+        <div id="webcamError" style="position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; color: #fff; padding: 20px; text-align: center; background: rgba(11, 21, 40, 0.95);">
+          <span class="material-icons-round" style="font-size: 40px; color: var(--c-danger); margin-bottom: 8px;">videocam_off</span>
+          <p id="webcamErrorMessage" style="font-size: 14px; margin-bottom: 16px; color: #e2e8f0;">Camera is not available or permission was denied.</p>
+          <button type="button" class="btn btn-primary btn-sm" onclick="fallbackToFileInput()">
+            <span class="material-icons-round" style="font-size: 18px;">folder_open</span> Choose Image from Files Instead
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Preview Controls -->
+      <div id="webcamLiveControls" style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" class="btn btn-primary btn-full" id="webcamCaptureBtn" onclick="captureWebcamPhoto()">
+          <span class="material-icons-round">photo_camera</span> Capture Photo
+        </button>
+        <button type="button" class="btn btn-ghost btn-full" onclick="closeWebcamModal()">Cancel</button>
+      </div>
+
+      <!-- Review Captured Photo Controls -->
+      <div id="webcamReviewControls" style="display: none; flex-direction: column; gap: 10px;">
+        <button type="button" class="btn btn-primary btn-full" id="webcamConfirmBtn" onclick="confirmWebcamPhoto()">
+          <span class="material-icons-round">check_circle</span> Use This Photo
+        </button>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn btn-outline btn-full" id="webcamRetakeBtn" onclick="retakeWebcamPhoto()">
+            <span class="material-icons-round">refresh</span> Retake
+          </button>
+          <button type="button" class="btn btn-ghost btn-full" onclick="closeWebcamModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
   <script src="worker.js"></script>
 </body>

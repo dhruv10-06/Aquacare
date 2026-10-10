@@ -229,12 +229,18 @@ function openSubmitReportModal(id) {
   document.getElementById('submitReportForm').reset();
   clearReportImage();
   closeWorkerPhotoChoiceModal();
+  if (typeof window.closeWebcamModal === 'function') {
+    window.closeWebcamModal();
+  }
   document.getElementById('submitReportModal').style.display = 'flex';
 }
 
 function closeSubmitReportModal() {
   document.getElementById('submitReportModal').style.display = 'none';
   closeWorkerPhotoChoiceModal();
+  if (typeof window.closeWebcamModal === 'function') {
+    window.closeWebcamModal();
+  }
 }
 
 // Evidence Photo Choice Modal & Controls (Matches Citizen Complaint Registration)
@@ -251,10 +257,51 @@ function closeWorkerPhotoChoiceModal() {
 function triggerWorkerCamera() {
   closeWorkerPhotoChoiceModal();
   const input = document.getElementById('reportImageInput');
-  if (input) {
-    input.setAttribute('capture', 'environment');
+
+  const checkMobile = typeof window.isMobileDevice === 'function' ? window.isMobileDevice : function() {
+    const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+  };
+
+  if (checkMobile()) {
+    // Mobile flow: strictly unchanged
+    if (input) {
+      input.setAttribute('capture', 'environment');
+      input.click();
+    }
+    return;
+  }
+
+  // Desktop / Laptop flow: open webcam
+  if (typeof window.openWebcamModal === 'function') {
+    window.openWebcamModal({
+      fallbackInputId: 'reportImageInput',
+      onConfirm: handleWorkerWebcamCapture
+    });
+  } else if (input) {
+    input.removeAttribute('capture');
     input.click();
   }
+}
+
+function handleWorkerWebcamCapture(file, dataUrl) {
+  reportFile = file;
+  const input = document.getElementById('reportImageInput');
+  if (input) {
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+    } catch (e) {
+      console.warn('DataTransfer not supported:', e);
+    }
+  }
+  const preview = document.getElementById('reportImagePreview');
+  if (preview) preview.src = dataUrl;
+  const container = document.getElementById('reportImagePreviewContainer');
+  if (container) container.style.display = 'block';
+  const uploadBox = document.getElementById('reportUploadBox');
+  if (uploadBox) uploadBox.style.display = 'none';
 }
 
 function triggerWorkerGallery() {
@@ -312,6 +359,7 @@ window.handleReportImageSelect = handleReportImageSelect;
 window.clearReportImage = clearReportImage;
 window.openSubmitReportModal = openSubmitReportModal;
 window.closeSubmitReportModal = closeSubmitReportModal;
+window.handleWorkerWebcamCapture = handleWorkerWebcamCapture;
 
 async function submitWorkerReport(e) {
   e.preventDefault();
