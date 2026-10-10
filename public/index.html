@@ -491,7 +491,16 @@
           <option value="In Progress">In Progress</option>
           <option value="Resolved">Resolved</option>
         </select>
+        <select id="categoryFilter" onchange="loadComplaints()">
+          <option value="All">All Categories</option>
+          <option value="Pipeline Leakage">Pipeline Leakage</option>
+          <option value="Overflowing Water Tank">Overflowing Water Tank</option>
+          <option value="Damaged Public Tap">Damaged Public Tap</option>
+          <option value="Other">Other</option>
+        </select>
       </div>
+
+      <div id="complaintsCount" style="margin-bottom: 12px; font-size: 0.9rem; font-weight: 500; color: var(--color-text-muted);"></div>
 
       <!-- Complaints List -->
       <div class="complaints-list" id="complaintsList">

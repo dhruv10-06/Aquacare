@@ -382,9 +382,14 @@ async function changePassword(e) {
 }
 
 // --- Dashboard: Load Stats ---
-async function loadStats() {
+async function loadStats(category = null) {
   try {
-    const res = await fetch(`${API}/api/admin/stats`, {
+    const activeCat = category !== null ? category : (document.getElementById('categoryFilter')?.value || 'All');
+    const params = new URLSearchParams();
+    if (activeCat && activeCat !== 'All') {
+      params.set('category', activeCat);
+    }
+    const res = await fetch(`${API}/api/admin/stats?${params}`, {
       headers: { 'Authorization': `Bearer ${adminToken}` }
     });
 
@@ -409,10 +414,12 @@ async function loadComplaints() {
 
   const search = document.getElementById('searchInput')?.value || '';
   const status = document.getElementById('statusFilter')?.value || 'All';
+  const category = document.getElementById('categoryFilter')?.value || 'All';
 
   const params = new URLSearchParams();
   if (search) params.set('search', search);
   if (status !== 'All') params.set('status', status);
+  if (category !== 'All') params.set('category', category);
 
   try {
     const res = await fetch(`${API}/api/admin/complaints?${params}`, {
@@ -424,6 +431,14 @@ async function loadComplaints() {
     
     await fetchWorkers(); // Ensure workers are loaded before rendering
     await fetchTeams();   // Ensure teams are loaded before rendering
+
+    // Update stats according to selected category
+    loadStats(category);
+
+    const countDiv = document.getElementById('complaintsCount');
+    if (countDiv) {
+      countDiv.textContent = `Showing ${complaints.length} complaint${complaints.length === 1 ? '' : 's'}`;
+    }
 
     if (complaints.length === 0) {
       listDiv.innerHTML = `<div class="empty-state"><span class="material-icons-round">inbox</span><p>No complaints found.</p></div>`;
@@ -473,12 +488,17 @@ function renderComplaintCard(c) {
   const leaderWorker = allWorkers.find(w => String(w.id) === String(c.leader_id));
   const leaderDetail = leaderWorker ? `<p><strong>Team Leader:</strong> <span class="status-badge" style="background:#e3f2fd; color:#1976d2;">${escapeHtml(leaderWorker.name)}</span></p>` : '';
 
+  const categoryName = c.category || 'Other';
+
   return `
     <div class="complaint-card" id="card-${c.id}">
       <div class="complaint-card-header">
         <div>
           <span class="complaint-card-id">${c.complaint_id}</span>
           <span class="status-badge ${getStatusClass(c.status)}">${c.status}</span>
+          <span class="status-badge" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; font-weight: 500;">
+            <span class="material-icons-round" style="font-size:13px; vertical-align:-2px; margin-right:3px;">category</span>${escapeHtml(categoryName)}
+          </span>
           ${overdueBadge}
         </div>
         <span class="complaint-card-date">${formatDate(c.created_at)}</span>
@@ -487,7 +507,7 @@ function renderComplaintCard(c) {
         <div class="complaint-card-details">
           <p><strong>Name:</strong> ${escapeHtml(c.name)}</p>
           <p><strong>Phone:</strong> ${escapeHtml(c.phone)}</p>
-          <p><strong>Category:</strong> ${escapeHtml(c.category || 'Other')}</p>
+          <p><strong>Category:</strong> <span style="background: #e0f2fe; color: #0284c7; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${escapeHtml(categoryName)}</span></p>
           <p><strong>Location:</strong> ${escapeHtml(c.location)}</p>
           <p><strong>Description:</strong> ${escapeHtml(c.description)}</p>
           ${c.assigned_team ? `<p><strong>Team:</strong> ${escapeHtml(c.assigned_team)}</p>` : ''}

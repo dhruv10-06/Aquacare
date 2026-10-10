@@ -694,7 +694,7 @@ img { max-width: 100%; }
 
 .search-box .material-icons-round { color: var(--color-text-muted); }
 
-#statusFilter {
+#statusFilter, #categoryFilter {
   padding: 12px 16px;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -705,7 +705,7 @@ img { max-width: 100%; }
   cursor: pointer;
   transition: var(--transition);
 }
-#statusFilter:focus { outline: none; border-color: var(--color-primary); }
+#statusFilter:focus, #categoryFilter:focus { outline: none; border-color: var(--color-primary); }
 
 /* Complaint Cards (Admin) */
 .complaint-card {

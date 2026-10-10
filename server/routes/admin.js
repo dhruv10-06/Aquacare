@@ -41,7 +41,7 @@ module.exports = function (db) {
   // GET /api/admin/complaints — Get all complaints (with optional search/filter)
   router.get('/complaints', authenticateAdmin, async (req, res) => {
     try {
-      const { search, status } = req.query;
+      const { search, status, category } = req.query;
       let query = 'SELECT * FROM complaints';
       const conditions = [];
       const params = [];
@@ -55,6 +55,16 @@ module.exports = function (db) {
       if (status && status !== 'All') {
         conditions.push('status = ?');
         params.push(status);
+      }
+
+      if (category && category !== 'All') {
+        if (category === 'Other') {
+          conditions.push("(category = ? OR category IS NULL OR category = '')");
+          params.push(category);
+        } else {
+          conditions.push('category = ?');
+          params.push(category);
+        }
       }
 
       if (conditions.length > 0) {
@@ -449,12 +459,25 @@ module.exports = function (db) {
   // GET /api/admin/stats — Dashboard statistics
   router.get('/stats', authenticateAdmin, async (req, res) => {
     try {
-      const totalResult = await db.execute('SELECT COUNT(*) as count FROM complaints');
-      const submittedResult = await db.execute("SELECT COUNT(*) as count FROM complaints WHERE status = 'Submitted'");
-      const underReviewResult = await db.execute("SELECT COUNT(*) as count FROM complaints WHERE status = 'Under Review'");
-      const assignedResult = await db.execute("SELECT COUNT(*) as count FROM complaints WHERE status = 'Assigned'");
-      const inProgressResult = await db.execute("SELECT COUNT(*) as count FROM complaints WHERE status = 'In Progress'");
-      const resolvedResult = await db.execute("SELECT COUNT(*) as count FROM complaints WHERE status = 'Resolved'");
+      const { category } = req.query;
+      let catCondition = '';
+      const catParams = [];
+      if (category && category !== 'All') {
+        if (category === 'Other') {
+          catCondition = " AND (category = ? OR category IS NULL OR category = '')";
+          catParams.push(category);
+        } else {
+          catCondition = ' AND category = ?';
+          catParams.push(category);
+        }
+      }
+
+      const totalResult = await db.execute({ sql: `SELECT COUNT(*) as count FROM complaints WHERE 1=1${catCondition}`, args: catParams });
+      const submittedResult = await db.execute({ sql: `SELECT COUNT(*) as count FROM complaints WHERE status = 'Submitted'${catCondition}`, args: catParams });
+      const underReviewResult = await db.execute({ sql: `SELECT COUNT(*) as count FROM complaints WHERE status = 'Under Review'${catCondition}`, args: catParams });
+      const assignedResult = await db.execute({ sql: `SELECT COUNT(*) as count FROM complaints WHERE status = 'Assigned'${catCondition}`, args: catParams });
+      const inProgressResult = await db.execute({ sql: `SELECT COUNT(*) as count FROM complaints WHERE status = 'In Progress'${catCondition}`, args: catParams });
+      const resolvedResult = await db.execute({ sql: `SELECT COUNT(*) as count FROM complaints WHERE status = 'Resolved'${catCondition}`, args: catParams });
 
       res.json({ 
         total: totalResult.rows[0].count, 
