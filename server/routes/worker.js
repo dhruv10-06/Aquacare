@@ -67,7 +67,7 @@ module.exports = function (db) {
       // Find all complaints assigned to teams this worker is a member of
       const query = `
         SELECT c.id, c.complaint_id, c.category, c.description, c.location, 
-               c.status, c.assigned_team, c.deadline, c.created_at, c.updated_at
+               c.status, c.assigned_team, c.deadline, c.created_at, c.updated_at, c.leader_id
         FROM complaints c
         JOIN teams t ON c.team_id = t.id
         JOIN team_memberships tm ON t.id = tm.team_id
@@ -113,7 +113,7 @@ module.exports = function (db) {
 
         complaints.forEach(c => {
           const assignedIds = cwMap[c.id] || [];
-          c.is_personally_assigned = assignedIds.some(id => String(id) === String(workerId));
+          c.is_team_leader = String(c.leader_id) === String(workerId);
           c.responsible_workers = assignedIds.map(id => workerNames[id] || 'Unknown').join(', ');
           
           if (c.status === 'In Progress' && rMap[c.id]) {
@@ -145,14 +145,7 @@ module.exports = function (db) {
         return res.status(404).json({ error: 'Complaint not found.' });
       }
 
-      // 2. Worker must be personally assigned
-      const cwRes = await db.execute({
-        sql: 'SELECT * FROM complaint_workers WHERE complaint_id = ? AND worker_id = ?',
-        args: [complaintId, workerId]
-      });
-      if (cwRes.rows.length === 0) {
-        return res.status(403).json({ error: 'You are not personally assigned to this task.' });
-      }
+      // 2. (Removed personal assignment check) Any active team member can start work
       
       // 3. Worker must currently belong to the active assigned team
       if (!complaint.team_id) {
@@ -238,14 +231,10 @@ module.exports = function (db) {
         return res.status(404).json({ error: 'Complaint not found.' });
       }
 
-      // 2. Worker must be personally assigned
-      const cwRes = await db.execute({
-        sql: 'SELECT * FROM complaint_workers WHERE complaint_id = ? AND worker_id = ?',
-        args: [complaintId, workerId]
-      });
-      if (cwRes.rows.length === 0) {
+      // 2. Worker must be designated team leader
+      if (String(complaint.leader_id) !== String(workerId)) {
         cleanupUpload();
-        return res.status(403).json({ error: 'You are not personally assigned to this task.' });
+        return res.status(403).json({ error: 'Only the designated team leader can submit the completion report.' });
       }
       
       // 3. Worker must currently belong to the active assigned team

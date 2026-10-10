@@ -112,7 +112,7 @@ async function loadWorkerTasks() {
     
     let html = '';
     tasks.forEach(t => {
-      if (t.is_personally_assigned) personalCount++;
+      if (t.is_team_leader) personalCount++;
       html += renderWorkerTaskCard(t);
     });
     
@@ -137,27 +137,25 @@ function renderWorkerTaskCard(t) {
   }
   
   const overdueBadge = isOverdue ? `<span class="status-badge" style="background:#ffebee; color:#d32f2f;">[OVERDUE]</span>` : '';
-  const personalBadge = t.is_personally_assigned ? `<span class="status-badge" style="background:#e3f2fd; color:#1976d2;">Assigned to You</span>` : '';
+  const leaderBadge = t.is_team_leader ? `<span class="status-badge" style="background:#e3f2fd; color:#1976d2;">Designated Team Leader</span>` : '';
   
   let actionHtml = '';
-  if (t.is_personally_assigned) {
-    if (t.status === 'Assigned') {
-      actionHtml = `
-        <div style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
-          <button class="btn btn-primary" onclick="startWork(${t.id})">
-            <span class="material-icons-round">play_arrow</span> Start Work
-          </button>
-        </div>
-      `;
-    } else if (t.status === 'In Progress') {
-      actionHtml = `
-        <div style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
-          <button class="btn btn-primary" onclick="openSubmitReportModal(${t.id})">
-            <span class="material-icons-round">upload_file</span> Submit Completion Report
-          </button>
-        </div>
-      `;
-    }
+  if (t.status === 'Assigned') {
+    actionHtml = `
+      <div style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
+        <button class="btn btn-primary" onclick="startWork(${t.id})">
+          <span class="material-icons-round">play_arrow</span> Start Work
+        </button>
+      </div>
+    `;
+  } else if (t.status === 'In Progress' && t.is_team_leader) {
+    actionHtml = `
+      <div style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
+        <button class="btn btn-primary" onclick="openSubmitReportModal(${t.id})">
+          <span class="material-icons-round">upload_file</span> Submit Completion Report
+        </button>
+      </div>
+    `;
   }
   
   const rejectionHtml = t.rejection_reason ? `
@@ -171,12 +169,12 @@ function renderWorkerTaskCard(t) {
   ` : '';
   
   return `
-    <div class="complaint-card" style="${t.is_personally_assigned ? 'border-left: 4px solid var(--primary);' : 'opacity: 0.8;'}">
+    <div class="complaint-card" style="${t.is_team_leader ? 'border-left: 4px solid var(--primary);' : 'opacity: 0.9;'}">
       <div class="complaint-card-header">
         <div>
           <span class="complaint-card-id">${t.complaint_id}</span>
           <span class="status-badge ${getStatusClass(t.status)}">${t.status}</span>
-          ${personalBadge}
+          ${leaderBadge}
           ${overdueBadge}
         </div>
         <span class="complaint-card-date">${formatDate(t.created_at)}</span>

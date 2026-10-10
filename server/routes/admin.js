@@ -86,7 +86,7 @@ module.exports = function (db) {
   });  // PATCH /api/admin/complaints/:id — Update complaint status/assignment
   router.patch('/complaints/:id', authenticateAdmin, async (req, res) => {
     try {
-      const { status, assigned_team, worker_id, deadline, team_id, worker_ids } = req.body;
+      const { status, assigned_team, worker_id, deadline, team_id, worker_ids, leader_id } = req.body;
       const { id } = req.params;
 
       const result = await db.execute({
@@ -197,6 +197,30 @@ module.exports = function (db) {
           statements.push({ sql: 'INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (?, ?)', args: [id, worker.id] });
         }
       }
+      // 2.5 Process Leader ID
+      let newLeaderId = complaint.leader_id;
+      if (leader_id !== undefined) {
+        if (leader_id === null || leader_id === '') {
+          newLeaderId = null;
+        } else {
+          if (!newTeamId) {
+            return res.status(400).json({ error: 'Cannot assign a leader without an assigned team.' });
+          }
+          const wRes = await db.execute({ sql: 'SELECT * FROM workers WHERE id = ?', args: [leader_id] });
+          const worker = wRes.rows[0];
+          if (!worker) return res.status(400).json({ error: 'Invalid leader ID.' });
+          if (worker.is_active === 0) return res.status(400).json({ error: 'Leader must be an active worker.' });
+
+          const memRes = await db.execute({ 
+            sql: 'SELECT * FROM team_memberships WHERE team_id = ? AND worker_id = ?', 
+            args: [newTeamId, leader_id] 
+          });
+          if (memRes.rows.length === 0) {
+            return res.status(400).json({ error: 'Leader does not belong to the assigned team.' });
+          }
+          newLeaderId = leader_id;
+        }
+      }
 
       // 3. Process Deadline
       let newDeadline = complaint.deadline;
@@ -218,9 +242,16 @@ module.exports = function (db) {
 
       // Add the final update statement
       statements.push({
-        sql: `UPDATE complaints SET status = ?, assigned_team = ?, worker_id = ?, deadline = ?, team_id = ?, status_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-        args: [newStatus, newAssignedTeam, newWorkerId, newDeadline, newTeamId, id]
+        sql: `UPDATE complaints SET status = ?, assigned_team = ?, worker_id = ?, deadline = ?, team_id = ?, leader_id = ?, status_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+        args: [newStatus, newAssignedTeam, newWorkerId, newDeadline, newTeamId, newLeaderId, id]
       });
+
+      if (newStatus !== complaint.status) {
+        statements.push({
+          sql: `INSERT INTO status_history (complaint_id, status, notes) VALUES (?, ?, ?)`,
+          args: [id, newStatus, 'Status updated by administrator.']
+        });
+      }
 
       // Execute all mutations atomically in a single batch transaction
       await db.batch(statements, 'write');

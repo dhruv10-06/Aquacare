@@ -90,6 +90,11 @@ async function initializeDatabase() {
     await db.execute('UPDATE complaints SET status_updated_at = updated_at');
   }
 
+  const hasLeaderId = tableInfo.rows.some(row => row.name === 'leader_id');
+  if (!hasLeaderId) {
+    await db.execute('ALTER TABLE complaints ADD COLUMN leader_id INTEGER REFERENCES workers(id)');
+  }
+
   // Create Phase 3 Tables
   await db.execute(`
     CREATE TABLE IF NOT EXISTS teams (

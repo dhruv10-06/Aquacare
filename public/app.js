@@ -466,9 +466,9 @@ function renderComplaintCard(c) {
     teamOptions += `<option value="${t.id}" ${t.id === c.team_id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`;
   });
 
-  const workerOptions = getWorkerOptionsForTeam(c.team_id, c.worker_ids || []);
+  const workerOptions = getWorkerOptionsForTeam(c.team_id, c.leader_id || null);
   
-  const legacyTeam = (c.assigned_team && !c.team_id && !c.worker_id && !c.worker_ids?.length) ? `<small style="color:#666; margin-left:8px;">Legacy Team: ${escapeHtml(c.assigned_team)}</small>` : '';
+  const legacyTeam = (c.assigned_team && !c.team_id && !c.worker_id && !c.leader_id) ? `<small style="color:#666; margin-left:8px;">Legacy Team: ${escapeHtml(c.assigned_team)}</small>` : '';
 
   return `
     <div class="complaint-card" id="card-${c.id}">
@@ -506,8 +506,9 @@ function renderComplaintCard(c) {
           </select>
         </div>
         <div style="display:flex; align-items:start; gap:4px;">
-          <label>Workers:</label>
-          <select multiple id="workers-${c.id}" style="width: 140px; height: 50px;">
+          <label>Team Leader:</label>
+          <select id="leader-${c.id}" style="width: 140px;">
+            <option value="">No leader</option>
             ${workerOptions}
           </select>
         </div>
@@ -517,7 +518,7 @@ function renderComplaintCard(c) {
           <input type="date" id="deadline-${c.id}" value="${c.deadline || ''}" style="width: 125px;">
         </div>
         <div style="margin-left:auto;">
-          <button class="btn btn-primary btn-sm" onclick="saveComplaintAssignment(${c.id})">
+          <button class="btn btn-primary btn-sm" onclick="saveComplaintAssignment(${c.id}, '${c.status}')">
             <span class="material-icons-round" style="font-size:16px;">save</span> Save
           </button>
           <button class="btn btn-danger btn-sm" onclick="confirmDeleteComplaint(${c.id})" style="margin-left:4px;">
@@ -529,7 +530,7 @@ function renderComplaintCard(c) {
   `;
 }
 
-function getWorkerOptionsForTeam(teamId, assignedWorkerIds = []) {
+function getWorkerOptionsForTeam(teamId, assignedLeaderId = null) {
   if (!teamId) return '<option value="" disabled>Select a team first</option>';
   
   const validWorkerIds = allTeamMemberships.filter(tm => tm.team_id == teamId).map(tm => tm.worker_id);
@@ -537,38 +538,45 @@ function getWorkerOptionsForTeam(teamId, assignedWorkerIds = []) {
   
   if (workers.length === 0) return '<option value="" disabled>No workers in this team</option>';
   
-  return workers.map(w => {
-    if (w.is_active || assignedWorkerIds.includes(w.id)) {
-      const isSelected = assignedWorkerIds.includes(w.id) ? 'selected' : '';
-      return `<option value="${w.id}" ${isSelected}>${escapeHtml(w.name)}</option>`;
+  let options = '';
+  workers.forEach(w => {
+    if (w.is_active || w.id === assignedLeaderId) {
+      const isSelected = w.id === assignedLeaderId ? 'selected' : '';
+      options += `<option value="${w.id}" ${isSelected}>${escapeHtml(w.name)}</option>`;
     }
-    return '';
-  }).join('');
+  });
+  return options;
 }
 
 function updateWorkerOptions(complaintId, teamId) {
-  const select = document.getElementById(`workers-${complaintId}`);
-  select.innerHTML = getWorkerOptionsForTeam(teamId, []);
+  const select = document.getElementById(`leader-${complaintId}`);
+  select.innerHTML = '<option value="">No leader</option>' + getWorkerOptionsForTeam(teamId, null);
 }
 
-async function saveComplaintAssignment(id) {
+async function saveComplaintAssignment(id, currentStatus) {
   const teamEl = document.getElementById(`team-${id}`);
-  const workerSelect = document.getElementById(`workers-${id}`);
+  const leaderSelect = document.getElementById(`leader-${id}`);
   
   const team_id = teamEl.value ? parseInt(teamEl.value) : null;
-  const worker_ids = Array.from(workerSelect.selectedOptions).map(opt => parseInt(opt.value)).filter(val => !isNaN(val));
+  const leader_id = leaderSelect.value ? parseInt(leaderSelect.value) : null;
   const deadline = document.getElementById(`deadline-${id}`).value;
   
-  await updateComplaint(id, undefined, team_id, worker_ids, deadline);
+  let status = undefined;
+  if (currentStatus === 'Submitted' && team_id) {
+    status = 'Assigned';
+  }
+  
+  await updateComplaint(id, status, team_id, undefined, deadline, leader_id);
 }
 
 // --- Dashboard: Update Complaint ---
-async function updateComplaint(id, status, team_id, worker_ids, deadline) {
+async function updateComplaint(id, status, team_id, worker_ids, deadline, leader_id) {
   const body = {};
   if (status !== undefined) body.status = status;
   if (team_id !== undefined) body.team_id = team_id;
   if (worker_ids !== undefined) body.worker_ids = worker_ids;
   if (deadline !== undefined) body.deadline = deadline;
+  if (leader_id !== undefined) body.leader_id = leader_id;
 
   try {
     const res = await fetch(`${API}/api/admin/complaints/${id}`, {

@@ -52,8 +52,8 @@ async function testConcurrency() {
   await db.execute("INSERT INTO team_memberships (team_id, worker_id) VALUES (1, 1)");
   await db.execute("INSERT INTO team_memberships (team_id, worker_id) VALUES (1, 2)");
   
-  // Complaint 1 is In Progress by W1 and W2 (Team 1)
-  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id) VALUES (1, 'CMP1', 'Bob', '11', 'desc', 'loc', 'In Progress', 1)");
+  // Complaint 1 is In Progress by W1 (leader) and W2 (Team 1)
+  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id, leader_id) VALUES (1, 'CMP1', 'Bob', '11', 'desc', 'loc', 'In Progress', 1, 1)");
   await db.execute("INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (1, 1)");
   await db.execute("INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (1, 2)");
 
@@ -102,7 +102,7 @@ async function testConcurrency() {
     method: 'POST', headers: { 'Authorization': `Bearer ${w1Token}` }, body: form1
   });
   const p2 = fetch(`${baseUrl}/api/worker/tasks/1/report`, {
-    method: 'POST', headers: { 'Authorization': `Bearer ${w2Token}` }, body: form2
+    method: 'POST', headers: { 'Authorization': `Bearer ${w1Token}` }, body: form2
   });
 
   const [res1, res2] = await Promise.all([p1, p2]);

@@ -44,11 +44,11 @@ async function testReportsAPI() {
   await db.execute("INSERT INTO team_memberships (team_id, worker_id) VALUES (1, 2)");
   
   // Complaint 1 is In Progress by W1
-  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id) VALUES (1, 'CMP1', 'Bob', '11', 'desc', 'loc', 'In Progress', 1)");
+  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id, leader_id) VALUES (1, 'CMP1', 'Bob', '11', 'desc', 'loc', 'In Progress', 1, 1)");
   await db.execute("INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (1, 1)");
   
   // Complaint 2 is Assigned to W2
-  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id) VALUES (2, 'CMP2', 'Alice', '22', 'desc', 'loc', 'Assigned', 1)");
+  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id, leader_id) VALUES (2, 'CMP2', 'Alice', '22', 'desc', 'loc', 'Assigned', 1, 2)");
   await db.execute("INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (2, 2)");
 
   const app = express();
@@ -105,13 +105,13 @@ async function testReportsAPI() {
   console.log('Test 1 Res:', res.status, await res.text());
   console.log('Cannot submit report for Assigned task (no image):', res.status === 400 ? '✅' : '❌');
 
-  // Test 2: Unauthorized worker cannot submit report
+  // Test 2: Non-leader worker cannot submit report
   res = await fetch(`${baseUrl}/api/worker/tasks/1/report`, {
     method: 'POST', headers: { 'Authorization': `Bearer ${w2Token}`, 'Content-Type': 'application/json' }, 
     body: JSON.stringify({ notes: 'Done' })
   });
   console.log('Test 2 Res:', res.status, await res.text());
-  console.log('Unauthorized worker cannot submit report:', res.status === 400 ? '✅' : '❌');
+  console.log('Non-leader worker cannot submit report:', res.status === 400 || res.status === 403 ? '✅' : '❌');
 
   // We skip Cloudinary successful upload test because mocking it deeply is hard here.
   // Instead, we will simulate a successful DB insert manually to test the Admin verification.

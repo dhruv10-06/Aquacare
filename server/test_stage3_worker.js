@@ -34,11 +34,11 @@ async function testWorkerAPI() {
   await db.execute("INSERT INTO team_memberships (team_id, worker_id) VALUES (1, 2)");
   await db.execute("INSERT INTO team_memberships (team_id, worker_id) VALUES (2, 2)"); // W2 is in both
   
-  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id) VALUES (1, 'CMP1', 'Bob', '11', 'desc', 'loc', 'Assigned', 1)");
-  await db.execute("INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (1, 1)"); // Assigned to W1
+  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id, leader_id) VALUES (1, 'CMP1', 'Bob', '11', 'desc', 'loc', 'Assigned', 1, 1)");
+  await db.execute("INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (1, 1)"); // Keep for transparency
 
-  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id) VALUES (2, 'CMP2', 'Alice', '22', 'desc', 'loc', 'Assigned', 2)");
-  await db.execute("INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (2, 2)"); // Assigned to W2
+  await db.execute("INSERT INTO complaints (id, complaint_id, name, phone, description, location, status, team_id, leader_id) VALUES (2, 'CMP2', 'Alice', '22', 'desc', 'loc', 'Assigned', 2, 2)");
+  await db.execute("INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (2, 2)"); // Keep for transparency
 
   const app = express();
   app.use(express.json());
@@ -101,9 +101,9 @@ async function testWorkerAPI() {
   const seesCMP2 = body.some(c => c.complaint_id === 'CMP2');
   console.log('Worker sees only authorized team complaints:', seesCMP1 && !seesCMP2 ? '✅' : '❌');
 
-  // Test 7: Personal assignment distinguished
+  // Test 7: Team leader distinguished
   const cmp1 = body.find(c => c.complaint_id === 'CMP1');
-  console.log('Personal assignment distinguished:', cmp1.is_personally_assigned === true ? '✅' : '❌');
+  console.log('Team leader distinguished:', cmp1.is_team_leader === true ? '✅' : '❌');
 
   // Test 8: Worker 2 login
   res = await fetch(`${baseUrl}/api/worker/login`, {
@@ -112,26 +112,27 @@ async function testWorkerAPI() {
   });
   const worker2Token = (await res.json()).token;
 
-  // Test 9: Worker cannot start another worker's complaint
-  // CMP1 is assigned to W1. W2 is in Team A, so W2 can see CMP1, but not start it.
+  // Test 9: Any active team member can start the complaint (W2 starting W1's leader task)
+  // CMP1 is led by W1. W2 is in Team A, so W2 can see CMP1, and now CAN start it.
   res = await fetch(`${baseUrl}/api/worker/tasks/1/start`, {
     method: 'PATCH', headers: { 'Authorization': `Bearer ${worker2Token}` }
   });
-  console.log('Worker cannot start another worker’s complaint:', res.status === 403 ? '✅' : '❌');
+  console.log('Any team member can start the team’s complaint:', res.status === 200 ? '✅' : '❌');
 
-  // Test 10: Worker can start their own eligible complaint
+  // Test 10: Worker can start their own eligible complaint (already started by W2, so this should fail as invalid transition)
   res = await fetch(`${baseUrl}/api/worker/tasks/1/start`, {
     method: 'PATCH', headers: { 'Authorization': `Bearer ${worker1Token}` }
   });
-  console.log('Worker can start their own complaint:', res.status === 200 ? '✅' : '❌');
+  console.log('Invalid status transition rejected (already started):', res.status === 400 ? '✅' : '❌');
 
   // Test 11: Invalid status transitions rejected (cannot start an already In Progress task)
-  res = await fetch(`${baseUrl}/api/worker/tasks/1/start`, {
-    method: 'PATCH', headers: { 'Authorization': `Bearer ${worker1Token}` }
+  // We already tested this in 10, but let's test starting a Resolved task or another In Progress task
+  res = await fetch(`${baseUrl}/api/worker/tasks/2/start`, {
+    method: 'PATCH', headers: { 'Authorization': `Bearer ${worker2Token}` }
   });
-  console.log('Invalid status transition rejected:', res.status === 400 ? '✅' : '❌');
+  console.log('Worker can start their own team complaint:', res.status === 200 ? '✅' : '❌');
 
-  // Test 12: Status history recorded correctly
+  // Test 12: Status history recorded correctly (CMP1 was started by W2)
   const histRes = await db.execute("SELECT * FROM status_history WHERE complaint_id = 1");
   console.log('Status history recorded:', histRes.rows.length === 1 && histRes.rows[0].status === 'In Progress' ? '✅' : '❌');
 
