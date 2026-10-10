@@ -585,22 +585,51 @@
             </div>
             <div class="form-group">
               <label>Evidence Photo <span class="required">*</span></label>
-              <div class="file-upload" id="reportUploadBox" onclick="document.getElementById('reportImageInput').click()">
-                <span class="material-icons-round">add_a_photo</span>
-                <p>Tap to take a photo or choose from gallery</p>
-                <input type="file" id="reportImageInput" accept="image/*" capture="environment" style="display: none;" onchange="handleReportImageSelect(event)" required>
-              </div>
-              <div id="reportImagePreviewContainer" style="display: none; margin-top: 1rem; position: relative;">
-                <img id="reportImagePreview" style="width: 100%; border-radius: 8px; display: block;">
-                <button type="button" class="btn btn-sm btn-danger" style="position: absolute; top: 8px; right: 8px;" onclick="clearReportImage()">
-                  <span class="material-icons-round" style="font-size: 16px;">close</span> Remove
-                </button>
+              <div class="file-upload-area" id="reportUploadArea">
+                <input type="file" id="reportImageInput" accept="image/*" style="display: none;" onchange="handleReportImageSelect(event)">
+                <div class="file-upload" id="reportUploadBox" onclick="openWorkerPhotoChoiceModal()">
+                  <span class="material-icons-round">add_a_photo</span>
+                  <p><strong>Add evidence photo of completed work</strong></p>
+                  <span class="file-hint">JPG, PNG or WebP — Camera or Gallery / Files</span>
+                </div>
+                <div class="photo-choice-actions" id="reportChoiceActions">
+                  <button type="button" class="btn btn-outline btn-full" onclick="triggerWorkerCamera()">
+                    <span class="material-icons-round">photo_camera</span> Take Photo
+                  </button>
+                  <button type="button" class="btn btn-outline btn-full" onclick="triggerWorkerGallery()">
+                    <span class="material-icons-round">photo_library</span> Choose from Gallery / Files
+                  </button>
+                </div>
+                <div id="reportImagePreviewContainer" style="display: none; margin-top: 1rem; position: relative;">
+                  <img id="reportImagePreview" style="width: 100%; border-radius: 8px; display: block; max-height: 250px; object-fit: contain; background: #000;" alt="Evidence Preview">
+                  <button type="button" class="btn btn-sm btn-danger" style="position: absolute; top: 8px; right: 8px;" onclick="clearReportImage()">
+                    <span class="material-icons-round" style="font-size: 16px;">close</span> Remove
+                  </button>
+                </div>
               </div>
             </div>
             <button type="submit" class="btn btn-primary btn-full" id="submitReportBtn">
               <span class="material-icons-round">upload_file</span> Submit Report
             </button>
           </form>
+        </div>
+      </div>
+
+      <!-- Worker Photo Choice Modal -->
+      <div id="workerPhotoChoiceModal" class="modal" style="display:none; z-index: 1000;" onclick="if(event.target === this) closeWorkerPhotoChoiceModal()">
+        <div class="modal-content form-card" style="max-width: 340px; text-align: center; padding: 24px;">
+          <h2 style="font-size: 1.2rem; margin-bottom: 20px;">Upload Evidence Photo</h2>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <button type="button" class="btn btn-primary btn-full" onclick="triggerWorkerCamera()">
+              <span class="material-icons-round">photo_camera</span> Take Photo
+            </button>
+            <button type="button" class="btn btn-outline btn-full" onclick="triggerWorkerGallery()">
+              <span class="material-icons-round">photo_library</span> Choose from Gallery / Files
+            </button>
+            <button type="button" class="btn btn-ghost btn-full" onclick="closeWorkerPhotoChoiceModal()">
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -228,11 +228,42 @@ function openSubmitReportModal(id) {
   document.getElementById('reportComplaintId').value = id;
   document.getElementById('submitReportForm').reset();
   clearReportImage();
-  document.getElementById('submitReportModal').style.display = 'block';
+  closeWorkerPhotoChoiceModal();
+  document.getElementById('submitReportModal').style.display = 'flex';
 }
 
 function closeSubmitReportModal() {
   document.getElementById('submitReportModal').style.display = 'none';
+  closeWorkerPhotoChoiceModal();
+}
+
+// Evidence Photo Choice Modal & Controls (Matches Citizen Complaint Registration)
+function openWorkerPhotoChoiceModal() {
+  const modal = document.getElementById('workerPhotoChoiceModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeWorkerPhotoChoiceModal() {
+  const modal = document.getElementById('workerPhotoChoiceModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function triggerWorkerCamera() {
+  closeWorkerPhotoChoiceModal();
+  const input = document.getElementById('reportImageInput');
+  if (input) {
+    input.setAttribute('capture', 'environment');
+    input.click();
+  }
+}
+
+function triggerWorkerGallery() {
+  closeWorkerPhotoChoiceModal();
+  const input = document.getElementById('reportImageInput');
+  if (input) {
+    input.removeAttribute('capture');
+    input.click();
+  }
 }
 
 function handleReportImageSelect(e) {
@@ -247,20 +278,44 @@ function handleReportImageSelect(e) {
   
   const reader = new FileReader();
   reader.onload = (e) => {
-    document.getElementById('reportImagePreview').src = e.target.result;
-    document.getElementById('reportImagePreviewContainer').style.display = 'block';
-    document.getElementById('reportUploadBox').style.display = 'none';
+    const preview = document.getElementById('reportImagePreview');
+    if (preview) preview.src = e.target.result;
+    const container = document.getElementById('reportImagePreviewContainer');
+    if (container) container.style.display = 'block';
+    const uploadBox = document.getElementById('reportUploadBox');
+    if (uploadBox) uploadBox.style.display = 'none';
+    const choiceActions = document.getElementById('reportChoiceActions');
+    if (choiceActions) choiceActions.style.display = 'none';
   };
   reader.readAsDataURL(file);
 }
 
 function clearReportImage() {
   reportFile = null;
-  document.getElementById('reportImageInput').value = '';
-  document.getElementById('reportImagePreview').src = '';
-  document.getElementById('reportImagePreviewContainer').style.display = 'none';
-  document.getElementById('reportUploadBox').style.display = 'block';
+  const input = document.getElementById('reportImageInput');
+  if (input) {
+    input.value = '';
+    input.removeAttribute('capture');
+  }
+  const preview = document.getElementById('reportImagePreview');
+  if (preview) preview.src = '';
+  const container = document.getElementById('reportImagePreviewContainer');
+  if (container) container.style.display = 'none';
+  const uploadBox = document.getElementById('reportUploadBox');
+  if (uploadBox) uploadBox.style.display = 'block';
+  const choiceActions = document.getElementById('reportChoiceActions');
+  if (choiceActions) choiceActions.style.display = 'flex';
 }
+
+// Ensure functions are accessible globally on window
+window.openWorkerPhotoChoiceModal = openWorkerPhotoChoiceModal;
+window.closeWorkerPhotoChoiceModal = closeWorkerPhotoChoiceModal;
+window.triggerWorkerCamera = triggerWorkerCamera;
+window.triggerWorkerGallery = triggerWorkerGallery;
+window.handleReportImageSelect = handleReportImageSelect;
+window.clearReportImage = clearReportImage;
+window.openSubmitReportModal = openSubmitReportModal;
+window.closeSubmitReportModal = closeSubmitReportModal;
 
 async function submitWorkerReport(e) {
   e.preventDefault();
