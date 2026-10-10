@@ -284,8 +284,6 @@ function handleReportImageSelect(e) {
     if (container) container.style.display = 'block';
     const uploadBox = document.getElementById('reportUploadBox');
     if (uploadBox) uploadBox.style.display = 'none';
-    const choiceActions = document.getElementById('reportChoiceActions');
-    if (choiceActions) choiceActions.style.display = 'none';
   };
   reader.readAsDataURL(file);
 }
@@ -303,8 +301,6 @@ function clearReportImage() {
   if (container) container.style.display = 'none';
   const uploadBox = document.getElementById('reportUploadBox');
   if (uploadBox) uploadBox.style.display = 'block';
-  const choiceActions = document.getElementById('reportChoiceActions');
-  if (choiceActions) choiceActions.style.display = 'flex';
 }
 
 // Ensure functions are accessible globally on window

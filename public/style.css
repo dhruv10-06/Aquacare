@@ -634,29 +634,6 @@ img { max-width: 100%; display: block; }
 .file-upload .material-icons-round { font-size: 32px; margin-bottom: var(--sp-2); color: var(--color-primary); }
 .file-upload p { font-size: var(--text-sm); font-weight: 500; margin: 0; }
 
-.photo-choice-actions {
-  display: flex;
-  gap: var(--sp-3);
-  margin-top: var(--sp-3);
-}
-.photo-choice-actions .btn {
-  flex: 1;
-  justify-content: center;
-  font-size: var(--text-sm);
-  height: 44px;
-}
-@media (max-width: 480px) {
-  .photo-choice-actions {
-    flex-direction: column;
-    gap: var(--sp-2);
-  }
-  .photo-choice-actions .btn {
-    width: 100%;
-    height: 48px;
-    font-size: 15px;
-  }
-}
-
 .file-preview { text-align: center; }
 .file-preview img { max-height: 200px; border-radius: var(--r-sm); margin-bottom: var(--sp-3); }
 
