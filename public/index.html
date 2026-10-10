@@ -81,24 +81,26 @@
     </div>
 
     <section class="how-it-works">
-      <h2>How It Works</h2>
-      <div class="steps-grid">
-        <div class="step-card">
-          <div class="step-number">1</div>
-          <h3>Report</h3>
-          <p>Fill in the details about the water leakage and upload a photo.</p>
-        </div>
-        <div class="step-connector"><span class="material-icons-round">arrow_forward</span></div>
-        <div class="step-card">
-          <div class="step-number">2</div>
-          <h3>Get Complaint ID</h3>
-          <p>Receive a unique Complaint ID to track your report's progress.</p>
-        </div>
-        <div class="step-connector"><span class="material-icons-round">arrow_forward</span></div>
-        <div class="step-card">
-          <div class="step-number">3</div>
-          <h3>Resolution</h3>
-          <p>Our maintenance team addresses the issue and updates the status.</p>
+      <div class="how-it-works-inner">
+        <h2>How It Works</h2>
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-number">1</div>
+            <h3>Report</h3>
+            <p>Fill in the details about the water leakage and upload a photo.</p>
+          </div>
+          <div class="step-connector"><span class="material-icons-round">arrow_forward</span></div>
+          <div class="step-card">
+            <div class="step-number">2</div>
+            <h3>Get Complaint ID</h3>
+            <p>Receive a unique Complaint ID to track your report's progress.</p>
+          </div>
+          <div class="step-connector"><span class="material-icons-round">arrow_forward</span></div>
+          <div class="step-card">
+            <div class="step-number">3</div>
+            <h3>Resolution</h3>
+            <p>Our maintenance team addresses the issue and updates the status.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -511,55 +513,58 @@
 
   <!-- WORKER LOGIN PAGE -->
   <template id="tpl-worker-login">
-    <div class="card" style="max-width: 400px; margin: 4rem auto;">
-      <div style="text-align: center; margin-bottom: 2rem;">
-        <span class="material-icons-round" style="font-size: 48px; color: var(--primary);">handyman</span>
-        <h2>Worker Portal</h2>
-        <p style="color: #666; margin-top: 0.5rem;">Sign in to access your assigned tasks</p>
+    <div class="page-container">
+      <div class="login-card">
+        <div class="login-icon">
+          <span class="material-icons-round">handyman</span>
+        </div>
+        <h1>Worker Portal</h1>
+        <p>Sign in to access your assigned tasks</p>
+        <form id="workerLoginForm" onsubmit="handleWorkerLogin(event)">
+          <div class="form-group">
+            <label for="workerUsername">Username</label>
+            <input type="text" id="workerUsername" placeholder="Enter your username" required>
+          </div>
+          <div class="form-group">
+            <label for="workerPassword">Password</label>
+            <input type="password" id="workerPassword" placeholder="Enter your password" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top: 0.5rem;">Sign In</button>
+        </form>
       </div>
-      
-      <form id="workerLoginForm" onsubmit="handleWorkerLogin(event)">
-        <div class="form-group">
-          <label>Username</label>
-          <input type="text" id="workerUsername" required>
-        </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="workerPassword" required>
-        </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Sign In</button>
-      </form>
     </div>
   </template>
 
   <!-- WORKER DASHBOARD PAGE -->
   <template id="tpl-worker-dashboard">
-    <div class="dashboard-header">
-      <div class="header-title">
-        <h2>Worker Dashboard</h2>
-        <p>Welcome, <span id="workerNameDisplay"></span></p>
-      </div>
-      <button class="btn btn-outline" onclick="workerLogout()">Logout</button>
-    </div>
-
-    <div class="dashboard-content">
-      <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
-        <div class="stat-card">
-          <h3>Assigned to You</h3>
-          <p class="stat-value" id="workerPersonalCount">0</p>
+    <div class="dashboard">
+      <div class="dashboard-header">
+        <div>
+          <h1><span class="material-icons-round">engineering</span> Worker Dashboard</h1>
+          <p>Welcome back, <span id="workerNameDisplay"></span></p>
         </div>
-        <div class="stat-card">
-          <h3>Team Tasks</h3>
-          <p class="stat-value" id="workerTeamCount">0</p>
+        <div>
+          <button class="btn btn-outline btn-sm" onclick="loadWorkerTasks()">
+            <span class="material-icons-round">refresh</span> Refresh
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="workerLogout()">
+            <span class="material-icons-round">logout</span> Logout
+          </button>
         </div>
       </div>
 
-      <div style="display: flex; justify-content: space-between; align-items: center; margin: 2rem 0 1rem 0;">
-        <h3 style="font-size: 1.25rem;">Your Tasks</h3>
-        <button class="btn btn-outline btn-sm" onclick="loadWorkerTasks()">
-          <span class="material-icons-round" style="font-size: 16px;">refresh</span> Refresh
-        </button>
+      <div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem;">
+        <div class="stat-card">
+          <div class="stat-value" id="workerPersonalCount">0</div>
+          <div class="stat-label">Leader Tasks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="workerTeamCount">0</div>
+          <div class="stat-label">Team Tasks</div>
+        </div>
       </div>
+
+      <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--c-navy); margin-bottom: 1rem;">Your Tasks</h3>
 
       <div class="complaints-list" id="workerTasksList">
         <p class="loading-text">Loading tasks...</p>
@@ -575,26 +580,26 @@
           <form onsubmit="submitWorkerReport(event)" id="submitReportForm">
             <input type="hidden" id="reportComplaintId">
             <div class="form-group">
-              <label for="reportNotes">Completion Notes <span style="color:red;">*</span></label>
-              <textarea id="reportNotes" rows="4" placeholder="Describe the work done..." required></textarea>
+              <label for="reportNotes">Completion Notes <span class="required">*</span></label>
+              <textarea id="reportNotes" rows="4" placeholder="Describe the work done in detail..." required></textarea>
             </div>
             <div class="form-group">
-              <label>Evidence Photo <span style="color:red;">*</span></label>
+              <label>Evidence Photo <span class="required">*</span></label>
               <div class="file-upload" id="reportUploadBox" onclick="document.getElementById('reportImageInput').click()">
-                <span class="material-icons-round" style="font-size: 32px; color: var(--primary); margin-bottom: 8px;">add_a_photo</span>
-                <p>Take a photo or choose from gallery</p>
+                <span class="material-icons-round">add_a_photo</span>
+                <p>Tap to take a photo or choose from gallery</p>
                 <input type="file" id="reportImageInput" accept="image/*" capture="environment" style="display: none;" onchange="handleReportImageSelect(event)" required>
               </div>
               <div id="reportImagePreviewContainer" style="display: none; margin-top: 1rem; position: relative;">
-                <img id="reportImagePreview" style="width: 100%; border-radius: 8px;">
+                <img id="reportImagePreview" style="width: 100%; border-radius: 8px; display: block;">
                 <button type="button" class="btn btn-sm btn-danger" style="position: absolute; top: 8px; right: 8px;" onclick="clearReportImage()">
                   <span class="material-icons-round" style="font-size: 16px;">close</span> Remove
                 </button>
               </div>
             </div>
-            <div style="margin-top: 1.5rem;">
-              <button type="submit" class="btn btn-primary btn-full" id="submitReportBtn">Submit Report</button>
-            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="submitReportBtn">
+              <span class="material-icons-round">upload_file</span> Submit Report
+            </button>
           </form>
         </div>
       </div>
