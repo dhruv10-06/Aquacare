@@ -25,9 +25,11 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // API Routes
 const complaintsRouter = require('./routes/complaints')(db);
 const adminRouter = require('./routes/admin')(db);
+const workerRouter = require('./routes/worker')(db);
 
 app.use('/api/complaints', complaintsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/worker', workerRouter);
 
 // Health check (preserved from original)
 app.get('/api/health', (req, res) => {

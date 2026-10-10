@@ -22,6 +22,7 @@
         <a href="#" onclick="navigateTo('home')" data-page="home">Home</a>
         <a href="#" onclick="navigateTo('report')" data-page="report">Report Issue</a>
         <a href="#" onclick="navigateTo('track')" data-page="track">Track Complaint</a>
+        <a href="#" onclick="navigateTo('worker-login')" data-page="worker-login">Worker</a>
         <a href="#" onclick="navigateTo('admin-login')" data-page="admin-login" class="nav-admin-btn">Admin</a>
       </div>
       <button class="nav-mobile-btn" onclick="toggleMobileMenu()">
@@ -32,6 +33,7 @@
       <a href="#" onclick="navigateTo('home')">Home</a>
       <a href="#" onclick="navigateTo('report')">Report Issue</a>
       <a href="#" onclick="navigateTo('track')">Track Complaint</a>
+      <a href="#" onclick="navigateTo('worker-login')" data-page="worker-login">Worker Portal</a>
       <a href="#" onclick="navigateTo('admin-login')" data-page="admin-login">Admin Portal</a>
     </div>
   </nav>
@@ -237,22 +239,33 @@
         <div class="track-detail"><strong>Location:</strong> <span class="detail-location"></span></div>
         <div class="track-detail"><strong>Description:</strong> <span class="detail-description"></span></div>
         <div class="track-detail detail-team" style="display:none;"><strong>Assigned Team:</strong> <span class="detail-assigned"></span></div>
+        <div class="track-detail detail-workers" style="display:none;"><strong>Assigned Workers:</strong> <span class="detail-workers-text"></span></div>
+        <div class="track-detail detail-deadline" style="display:none;">
+          <strong>Deadline:</strong> <span class="detail-deadline-text"></span> 
+          <span class="detail-overdue-badge status-badge" style="display:none; background:#ffebee; color:#c62828; font-size:0.8rem; margin-left:8px;">Overdue</span>
+        </div>
         <div class="track-image-container" style="display:none;">
           <strong>Photo:</strong>
           <img class="track-image" alt="Complaint photo">
         </div>
       </div>
-      <!-- Progress bar -->
-      <div class="progress-tracker">
-        <div class="progress-step" data-step="Submitted"><div class="progress-dot"></div><span>Submitted</span></div>
-        <div class="progress-line"></div>
-        <div class="progress-step" data-step="Under Review"><div class="progress-dot"></div><span>Under Review</span></div>
-        <div class="progress-line"></div>
-        <div class="progress-step" data-step="Assigned"><div class="progress-dot"></div><span>Assigned</span></div>
-        <div class="progress-line"></div>
-        <div class="progress-step" data-step="In Progress"><div class="progress-dot"></div><span>In Progress</span></div>
-        <div class="progress-line"></div>
-        <div class="progress-step" data-step="Resolved"><div class="progress-dot"></div><span>Resolved</span></div>
+
+      <!-- Chronological Status History -->
+      <div style="margin-top: 1.5rem; border-top: 1px solid #eee; padding-top: 1rem;">
+        <h3 style="margin-top:0; font-size: 1.1rem;">Status History</h3>
+        <ul id="timelineList" style="list-style-type: none; padding-left: 0; margin-top: 10px; font-size: 0.9rem; color: #555;">
+          <!-- Populated by JS -->
+        </ul>
+        <p id="timelineEmpty" style="display:none; color: #999; font-size: 0.9rem;">No history available.</p>
+      </div>
+
+      <!-- Approved Completion Evidence -->
+      <div id="completionEvidence" style="display:none; margin-top: 1rem; padding: 1rem; background: #f1f8e9; border-left: 4px solid #4caf50; border-radius: 4px;">
+        <h3 style="color: #2e7d32; margin:0 0 10px 0; font-size: 1.1rem;"><span class="material-icons-round" style="vertical-align: middle; font-size:1.2rem;">verified</span> Completion Report</h3>
+        <p style="margin: 0 0 10px 0; font-size: 0.95rem;"><strong>Notes:</strong> <span id="completionNotes"></span></p>
+        <div id="completionImageContainer" style="display:none;">
+          <img id="completionImage" style="max-width: 100%; border-radius: 4px; max-height: 300px; object-fit: contain;" alt="Completion Evidence">
+        </div>
       </div>
     </div>
   </template>
@@ -294,7 +307,10 @@
           <p>Manage and resolve water leakage complaints</p>
         </div>
         <div>
-          <button class="btn btn-outline btn-sm" onclick="showWorkersModal()">
+          <button class="btn btn-outline btn-sm" onclick="showTeamsModal()">
+            <span class="material-icons-round">groups</span> Manage Teams
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="showWorkersModal()" style="margin-left: 8px;">
             <span class="material-icons-round">engineering</span> Manage Workers
           </button>
           <button class="btn btn-outline btn-sm" onclick="showChangePasswordModal()" style="margin-left: 8px;">
@@ -359,6 +375,52 @@
         </div>
       </div>
       
+      <!-- Teams Modal -->
+      <div id="teamsModal" class="modal" style="display:none;">
+        <div class="modal-content form-card" style="max-width: 600px;">
+          <div class="modal-header">
+            <h2>Maintenance Teams</h2>
+            <span class="close-modal" onclick="closeTeamsModal()">&times;</span>
+          </div>
+          
+          <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-color); border-radius: 8px;">
+            <h3 style="font-size: 1rem; margin-bottom: 12px;">Create New Team</h3>
+            <form onsubmit="createTeam(event)" style="display: flex; gap: 12px;">
+              <input type="text" id="tName" placeholder="Team Name" required style="flex: 1;">
+              <button type="submit" class="btn btn-primary">Create</button>
+            </form>
+          </div>
+          
+          <div id="teamsList" style="display: flex; flex-direction: column; gap: 12px; max-height: 300px; overflow-y: auto;">
+            <!-- Render teams here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Team Members Modal -->
+      <div id="teamMembersModal" class="modal" style="display:none;">
+        <div class="modal-content form-card" style="max-width: 600px;">
+          <div class="modal-header">
+            <h2 id="teamMembersTitle">Team Members</h2>
+            <span class="close-modal" onclick="closeTeamMembersModal()">&times;</span>
+          </div>
+          
+          <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-color); border-radius: 8px;">
+            <h3 style="font-size: 1rem; margin-bottom: 12px;">Assign Worker</h3>
+            <div style="display: flex; gap: 12px;">
+              <select id="workerSelect" style="flex: 1;">
+                <option value="" disabled selected>Select a worker...</option>
+              </select>
+              <button class="btn btn-primary" onclick="addWorkerToTeam()">Add</button>
+            </div>
+          </div>
+          
+          <div id="teamMembersList" style="display: flex; flex-direction: column; gap: 12px; max-height: 300px; overflow-y: auto;">
+            <!-- Render members here -->
+          </div>
+        </div>
+      </div>
+      
       <!-- Delete Complaint Modal -->
       <div id="deleteComplaintModal" class="modal" style="display:none;">
         <div class="modal-content form-card">
@@ -375,8 +437,38 @@
         </div>
       </div>
 
+      <!-- Pending Verification Section -->
+      <div id="pendingVerificationSection" style="margin-top: 2rem; display: none;">
+        <h3 style="font-size: 1.25rem; margin-bottom: 1rem; color: #f57c00;"><span class="material-icons-round" style="vertical-align: middle;">pending_actions</span> Pending Verification</h3>
+        <div id="pendingReportsList" class="complaints-list">
+          <p class="loading-text">Loading pending reports...</p>
+        </div>
+      </div>
+
+      <!-- Verify Report Modal -->
+      <div id="verifyReportModal" class="modal" style="display:none;">
+        <div class="modal-content form-card" style="max-width: 600px;">
+          <div class="modal-header">
+            <h2>Verify Work Report</h2>
+            <span class="close-modal" onclick="closeVerifyModal()">&times;</span>
+          </div>
+          <div id="verifyReportDetails" style="margin-bottom: 1.5rem;"></div>
+          <form onsubmit="submitVerification(event)">
+            <input type="hidden" id="verifyComplaintId">
+            <div class="form-group" id="rejectionReasonGroup" style="display:none;">
+              <label for="rejectionReason">Rejection Reason <span style="color:red;">*</span></label>
+              <textarea id="rejectionReason" rows="3" placeholder="Explain why the work is rejected..."></textarea>
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 1rem;">
+              <button type="button" class="btn btn-danger" onclick="toggleRejectionReason()">Reject</button>
+              <button type="submit" class="btn btn-primary" id="approveBtn">Approve Work</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <!-- Stats -->
-      <div class="stats-grid" id="statsGrid">
+      <div class="stats-grid" id="statsGrid" style="margin-top: 2rem;">
         <div class="stat-card stat-total"><div class="stat-value" id="statTotal">—</div><div class="stat-label">Total</div></div>
         <div class="stat-card stat-submitted"><div class="stat-value" id="statSubmitted">—</div><div class="stat-label">Submitted</div></div>
         <div class="stat-card stat-review"><div class="stat-value" id="statReview">—</div><div class="stat-label">Under Review</div></div>
@@ -408,6 +500,98 @@
     </div>
   </template>
 
+  <!-- WORKER LOGIN PAGE -->
+  <template id="tpl-worker-login">
+    <div class="card" style="max-width: 400px; margin: 4rem auto;">
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <span class="material-icons-round" style="font-size: 48px; color: var(--primary);">handyman</span>
+        <h2>Worker Portal</h2>
+        <p style="color: #666; margin-top: 0.5rem;">Sign in to access your assigned tasks</p>
+      </div>
+      
+      <form id="workerLoginForm" onsubmit="handleWorkerLogin(event)">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="workerUsername" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="workerPassword" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Sign In</button>
+      </form>
+    </div>
+  </template>
+
+  <!-- WORKER DASHBOARD PAGE -->
+  <template id="tpl-worker-dashboard">
+    <div class="dashboard-header">
+      <div class="header-title">
+        <h2>Worker Dashboard</h2>
+        <p>Welcome, <span id="workerNameDisplay"></span></p>
+      </div>
+      <button class="btn btn-outline" onclick="workerLogout()">Logout</button>
+    </div>
+
+    <div class="dashboard-content">
+      <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="stat-card">
+          <h3>Assigned to You</h3>
+          <p class="stat-value" id="workerPersonalCount">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Team Tasks</h3>
+          <p class="stat-value" id="workerTeamCount">0</p>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin: 2rem 0 1rem 0;">
+        <h3 style="font-size: 1.25rem;">Your Tasks</h3>
+        <button class="btn btn-outline btn-sm" onclick="loadWorkerTasks()">
+          <span class="material-icons-round" style="font-size: 16px;">refresh</span> Refresh
+        </button>
+      </div>
+
+      <div class="complaints-list" id="workerTasksList">
+        <p class="loading-text">Loading tasks...</p>
+      </div>
+      
+      <!-- Submit Report Modal -->
+      <div id="submitReportModal" class="modal" style="display:none;">
+        <div class="modal-content form-card" style="max-width: 600px;">
+          <div class="modal-header">
+            <h2>Submit Completion Report</h2>
+            <span class="close-modal" onclick="closeSubmitReportModal()">&times;</span>
+          </div>
+          <form onsubmit="submitWorkerReport(event)" id="submitReportForm">
+            <input type="hidden" id="reportComplaintId">
+            <div class="form-group">
+              <label for="reportNotes">Completion Notes <span style="color:red;">*</span></label>
+              <textarea id="reportNotes" rows="4" placeholder="Describe the work done..." required></textarea>
+            </div>
+            <div class="form-group">
+              <label>Evidence Photo <span style="color:red;">*</span></label>
+              <div class="file-upload" id="reportUploadBox" onclick="document.getElementById('reportImageInput').click()">
+                <span class="material-icons-round" style="font-size: 32px; color: var(--primary); margin-bottom: 8px;">add_a_photo</span>
+                <p>Take a photo or choose from gallery</p>
+                <input type="file" id="reportImageInput" accept="image/*" capture="environment" style="display: none;" onchange="handleReportImageSelect(event)" required>
+              </div>
+              <div id="reportImagePreviewContainer" style="display: none; margin-top: 1rem; position: relative;">
+                <img id="reportImagePreview" style="width: 100%; border-radius: 8px;">
+                <button type="button" class="btn btn-sm btn-danger" style="position: absolute; top: 8px; right: 8px;" onclick="clearReportImage()">
+                  <span class="material-icons-round" style="font-size: 16px;">close</span> Remove
+                </button>
+              </div>
+            </div>
+            <div style="margin-top: 1.5rem;">
+              <button type="submit" class="btn btn-primary btn-full" id="submitReportBtn">Submit Report</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </template>
+
   <!-- FOOTER -->
   <footer class="footer">
     <div class="footer-content">
@@ -417,5 +601,6 @@
   </footer>
 
   <script src="app.js"></script>
+  <script src="worker.js"></script>
 </body>
 </html>

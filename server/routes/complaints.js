@@ -71,7 +71,13 @@ module.exports = function (db) {
   router.get('/track/:complaintId', async (req, res) => {
     try {
       const result = await db.execute({
-        sql: 'SELECT * FROM complaints WHERE complaint_id = ?',
+        sql: `
+          SELECT c.id, c.complaint_id, c.name, c.description, c.location, c.image_path, c.category, c.status, c.created_at, c.deadline,
+                 t.name as team_name
+          FROM complaints c
+          LEFT JOIN teams t ON c.team_id = t.id
+          WHERE c.complaint_id = ?
+        `,
         args: [req.params.complaintId]
       });
       const complaint = result.rows[0];
@@ -79,6 +85,37 @@ module.exports = function (db) {
       if (!complaint) {
         return res.status(404).json({ error: 'Complaint not found. Please check the Complaint ID.' });
       }
+
+      // Calculate overdue
+      const isOverdue = complaint.deadline && new Date(complaint.deadline) < new Date() && complaint.status !== 'Resolved';
+      complaint.isOverdue = !!isOverdue;
+
+      // Get assigned workers
+      const workersRes = await db.execute({
+        sql: `
+          SELECT w.name 
+          FROM complaint_workers cw
+          JOIN workers w ON cw.worker_id = w.id
+          WHERE cw.complaint_id = ?
+        `,
+        args: [complaint.id]
+      });
+      complaint.assigned_workers = workersRes.rows.map(w => w.name);
+
+      // Get chronological status history
+      // Note: Omit internal admin notes if they exist, but status_history 'notes' are just transition logs
+      const historyRes = await db.execute({
+        sql: `SELECT status, notes, created_at FROM status_history WHERE complaint_id = ? ORDER BY created_at ASC`,
+        args: [complaint.id]
+      });
+      complaint.status_history = historyRes.rows;
+
+      // Get approved completion report evidence
+      const reportRes = await db.execute({
+        sql: `SELECT notes, image_path, created_at FROM work_reports WHERE complaint_id = ? AND status = 'Approved' ORDER BY id DESC LIMIT 1`,
+        args: [complaint.id]
+      });
+      complaint.completion_report = reportRes.rows[0] || null;
 
       res.json(complaint);
     } catch (err) {

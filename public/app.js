@@ -10,6 +10,8 @@ let adminToken = sessionStorage.getItem('aquacare_token') || null;
 let lastComplaintId = null;
 let searchTimeout = null;
 let allWorkers = [];
+let allTeams = [];
+let allTeamMemberships = [];
 
 // --- Navigation ---
 function navigateTo(page) {
@@ -41,6 +43,7 @@ function navigateTo(page) {
   }
   if (page === 'dashboard') {
     loadStats();
+    loadPendingReports();
     loadComplaints();
   }
 
@@ -182,10 +185,27 @@ async function trackComplaint() {
     badge.className = 'status-badge ' + getStatusClass(data.status);
 
     // Assigned team
-    if (data.assigned_team) {
+    if (data.team_name) {
       const teamEl = clone.querySelector('.detail-team');
       teamEl.style.display = 'block';
-      clone.querySelector('.detail-assigned').textContent = data.assigned_team;
+      clone.querySelector('.detail-assigned').textContent = data.team_name;
+    }
+
+    // Assigned workers
+    if (data.assigned_workers && data.assigned_workers.length > 0) {
+      const workersEl = clone.querySelector('.detail-workers');
+      workersEl.style.display = 'block';
+      clone.querySelector('.detail-workers-text').textContent = data.assigned_workers.join(', ');
+    }
+
+    // Deadline & Overdue
+    if (data.deadline) {
+      const deadlineEl = clone.querySelector('.detail-deadline');
+      deadlineEl.style.display = 'block';
+      clone.querySelector('.detail-deadline-text').textContent = formatDate(data.deadline);
+      if (data.isOverdue) {
+        clone.querySelector('.detail-overdue-badge').style.display = 'inline-block';
+      }
     }
 
     // Image
@@ -195,9 +215,41 @@ async function trackComplaint() {
       clone.querySelector('.track-image').src = data.image_path;
     }
 
+    // Status History Timeline
+    const timelineList = clone.querySelector('#timelineList');
+    const timelineEmpty = clone.querySelector('#timelineEmpty');
+    if (data.status_history && data.status_history.length > 0) {
+      data.status_history.forEach(history => {
+        const li = document.createElement('li');
+        li.style.marginBottom = '10px';
+        li.innerHTML = `
+          <div style="font-weight:bold; color:#333;">${history.status} <span style="font-weight:normal; color:#888; font-size:0.85rem; margin-left:8px;">${formatDate(history.created_at)}</span></div>
+          <div style="margin-top:2px;">${escapeHtml(history.notes || '')}</div>
+        `;
+        timelineList.appendChild(li);
+      });
+    } else {
+      timelineEmpty.style.display = 'block';
+    }
+
+    // Approved Completion Evidence
+    if (data.completion_report) {
+      const evidenceEl = clone.querySelector('#completionEvidence');
+      evidenceEl.style.display = 'block';
+      clone.querySelector('#completionNotes').textContent = data.completion_report.notes;
+      if (data.completion_report.image_path) {
+        const imgContainer = clone.querySelector('#completionImageContainer');
+        imgContainer.style.display = 'block';
+        const img = clone.querySelector('#completionImage');
+        img.src = data.completion_report.image_path.startsWith('http') ? data.completion_report.image_path : `${API}/${data.completion_report.image_path}`;
+      }
+    }
+
     // Progress tracker
+    // Maintain Awaiting Admin Verification as part of In Progress step for the tracker bar, or just Resolved if it's Resolved.
+    const trackerStatus = data.status === 'Awaiting Admin Verification' ? 'In Progress' : data.status;
     const statuses = ['Submitted', 'Under Review', 'Assigned', 'In Progress', 'Resolved'];
-    const currentIdx = statuses.indexOf(data.status);
+    const currentIdx = statuses.indexOf(trackerStatus);
     const steps = clone.querySelectorAll('.progress-step');
     const lines = clone.querySelectorAll('.progress-line');
 
@@ -371,6 +423,7 @@ async function loadComplaints() {
     const complaints = await res.json();
     
     await fetchWorkers(); // Ensure workers are loaded before rendering
+    await fetchTeams();   // Ensure teams are loaded before rendering
 
     if (complaints.length === 0) {
       listDiv.innerHTML = `<div class="empty-state"><span class="material-icons-round">inbox</span><p>No complaints found.</p></div>`;
@@ -408,12 +461,14 @@ function renderComplaintCard(c) {
   }
   const overdueBadge = isOverdue ? `<span class="status-badge" style="background:#ffebee; color:#d32f2f;">[OVERDUE]</span>` : '';
 
-  let workerOptions = `<option value="">Unassigned</option>`;
-  allWorkers.filter(w => w.is_active || w.id === c.worker_id).forEach(w => {
-    workerOptions += `<option value="${w.id}" ${w.id === c.worker_id ? 'selected' : ''}>${escapeHtml(w.name)}</option>`;
+  let teamOptions = `<option value="">Unassigned</option>`;
+  allTeams.filter(t => t.is_active || t.id === c.team_id).forEach(t => {
+    teamOptions += `<option value="${t.id}" ${t.id === c.team_id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`;
   });
+
+  const workerOptions = getWorkerOptionsForTeam(c.team_id, c.worker_ids || []);
   
-  const legacyTeam = (c.assigned_team && !c.worker_id) ? `<small style="color:#666; margin-left:8px;">Legacy Team: ${escapeHtml(c.assigned_team)}</small>` : '';
+  const legacyTeam = (c.assigned_team && !c.team_id && !c.worker_id && !c.worker_ids?.length) ? `<small style="color:#666; margin-left:8px;">Legacy Team: ${escapeHtml(c.assigned_team)}</small>` : '';
 
   return `
     <div class="complaint-card" id="card-${c.id}">
@@ -437,35 +492,83 @@ function renderComplaintCard(c) {
         </div>
         ${imageHtml}
       </div>
-      <div class="complaint-card-actions">
-        <label>Status:</label>
-        <select onchange="updateComplaint(${c.id}, this.value, null, null)" id="status-${c.id}">
-          ${statusOptions}
-        </select>
-        <label style="margin-left:8px;">Worker:</label>
-        <select id="worker-${c.id}" style="width: 140px;">
-          ${workerOptions}
-        </select>
+      <div class="complaint-card-actions" style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; align-items:center; gap:4px;">
+          <label>Status:</label>
+          <select onchange="updateComplaint(${c.id}, this.value, undefined, undefined, undefined)" id="status-${c.id}">
+            ${statusOptions}
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <label>Team:</label>
+          <select id="team-${c.id}" onchange="updateWorkerOptions(${c.id}, this.value)" style="width: 140px;">
+            ${teamOptions}
+          </select>
+        </div>
+        <div style="display:flex; align-items:start; gap:4px;">
+          <label>Workers:</label>
+          <select multiple id="workers-${c.id}" style="width: 140px; height: 50px;">
+            ${workerOptions}
+          </select>
+        </div>
         ${legacyTeam}
-        <label style="margin-left:8px;">Deadline:</label>
-        <input type="date" id="deadline-${c.id}" value="${c.deadline || ''}" style="width: 125px;">
-        <button class="btn btn-primary btn-sm" onclick="updateComplaint(${c.id}, null, document.getElementById('worker-${c.id}').value, document.getElementById('deadline-${c.id}').value)" style="margin-left:8px;">
-          <span class="material-icons-round" style="font-size:16px;">save</span> Save
-        </button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDeleteComplaint(${c.id})" style="margin-left:auto;">
-          <span class="material-icons-round" style="font-size:16px;">delete</span> Delete
-        </button>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <label>Deadline:</label>
+          <input type="date" id="deadline-${c.id}" value="${c.deadline || ''}" style="width: 125px;">
+        </div>
+        <div style="margin-left:auto;">
+          <button class="btn btn-primary btn-sm" onclick="saveComplaintAssignment(${c.id})">
+            <span class="material-icons-round" style="font-size:16px;">save</span> Save
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDeleteComplaint(${c.id})" style="margin-left:4px;">
+            <span class="material-icons-round" style="font-size:16px;">delete</span> Delete
+          </button>
+        </div>
       </div>
     </div>
   `;
 }
 
+function getWorkerOptionsForTeam(teamId, assignedWorkerIds = []) {
+  if (!teamId) return '<option value="" disabled>Select a team first</option>';
+  
+  const validWorkerIds = allTeamMemberships.filter(tm => tm.team_id == teamId).map(tm => tm.worker_id);
+  const workers = allWorkers.filter(w => validWorkerIds.includes(w.id));
+  
+  if (workers.length === 0) return '<option value="" disabled>No workers in this team</option>';
+  
+  return workers.map(w => {
+    if (w.is_active || assignedWorkerIds.includes(w.id)) {
+      const isSelected = assignedWorkerIds.includes(w.id) ? 'selected' : '';
+      return `<option value="${w.id}" ${isSelected}>${escapeHtml(w.name)}</option>`;
+    }
+    return '';
+  }).join('');
+}
+
+function updateWorkerOptions(complaintId, teamId) {
+  const select = document.getElementById(`workers-${complaintId}`);
+  select.innerHTML = getWorkerOptionsForTeam(teamId, []);
+}
+
+async function saveComplaintAssignment(id) {
+  const teamEl = document.getElementById(`team-${id}`);
+  const workerSelect = document.getElementById(`workers-${id}`);
+  
+  const team_id = teamEl.value ? parseInt(teamEl.value) : null;
+  const worker_ids = Array.from(workerSelect.selectedOptions).map(opt => parseInt(opt.value)).filter(val => !isNaN(val));
+  const deadline = document.getElementById(`deadline-${id}`).value;
+  
+  await updateComplaint(id, undefined, team_id, worker_ids, deadline);
+}
+
 // --- Dashboard: Update Complaint ---
-async function updateComplaint(id, status, worker_id, deadline) {
+async function updateComplaint(id, status, team_id, worker_ids, deadline) {
   const body = {};
-  if (status) body.status = status;
-  if (worker_id !== null) body.worker_id = worker_id;
-  if (deadline !== null) body.deadline = deadline;
+  if (status !== undefined) body.status = status;
+  if (team_id !== undefined) body.team_id = team_id;
+  if (worker_ids !== undefined) body.worker_ids = worker_ids;
+  if (deadline !== undefined) body.deadline = deadline;
 
   try {
     const res = await fetch(`${API}/api/admin/complaints/${id}`, {
@@ -532,6 +635,169 @@ async function deleteComplaint(id) {
     btn.disabled = false;
   }
 }
+
+// --- Teams Directory ---
+async function fetchTeams() {
+  if (!adminToken) return;
+  try {
+    const res = await fetch(`${API}/api/admin/teams`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
+    if (res.ok) allTeams = await res.json();
+    const mRes = await fetch(`${API}/api/admin/team-memberships`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
+    if (mRes.ok) allTeamMemberships = await mRes.json();
+  } catch (err) { console.error(err); }
+}
+
+async function showTeamsModal() {
+  document.getElementById('teamsModal').style.display = 'flex';
+  await fetchTeams();
+  renderTeamsList();
+}
+function closeTeamsModal() {
+  document.getElementById('teamsModal').style.display = 'none';
+}
+
+function renderTeamsList() {
+  const list = document.getElementById('teamsList');
+  if (!allTeams.length) { list.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No teams found.</p>'; return; }
+  
+  list.innerHTML = allTeams.map(t => `
+    <div style="border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; background: white; margin-bottom: 8px;">
+      <div>
+        <p style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(t.name)}</p>
+        <span class="status-badge ${t.is_active ? 'status-resolved' : 'status-assigned'}">${t.is_active ? 'Active' : 'Inactive'}</span>
+      </div>
+      <div>
+        <button class="btn btn-outline btn-sm" onclick="showTeamMembersModal(${t.id}, '${escapeHtml(t.name.replace(/'/g, "\\'"))}')">Members</button>
+        <button class="btn ${t.is_active ? 'btn-danger' : 'btn-primary'} btn-sm" onclick="toggleTeamStatus(${t.id}, ${!t.is_active})" style="margin-left:8px;">
+          ${t.is_active ? 'Deactivate' : 'Activate'}
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function createTeam(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button');
+  btn.disabled = true;
+  try {
+    const name = document.getElementById('tName').value;
+    const res = await fetch(`${API}/api/admin/teams`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast('Team created successfully!');
+    e.target.reset();
+    await fetchTeams();
+    renderTeamsList();
+  } catch (err) {
+    showToast(err.message || 'Failed to create team.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function toggleTeamStatus(id, is_active) {
+  try {
+    const res = await fetch(`${API}/api/admin/teams/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({ is_active })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast('Team status updated!');
+    await fetchTeams();
+    renderTeamsList();
+  } catch (err) {
+    showToast(err.message || 'Failed to update team status.', 'error');
+  }
+}
+
+let currentTeamIdForMembers = null;
+
+async function showTeamMembersModal(teamId, teamName) {
+  currentTeamIdForMembers = teamId;
+  document.getElementById('teamMembersTitle').textContent = `Members: ${teamName}`;
+  document.getElementById('teamMembersModal').style.display = 'flex';
+  
+  await fetchWorkers(); // Ensure we have latest workers for dropdown
+  
+  const workerSelect = document.getElementById('workerSelect');
+  workerSelect.innerHTML = '<option value="" disabled selected>Select an active worker...</option>' + 
+    allWorkers.filter(w => w.is_active).map(w => `<option value="${w.id}">${escapeHtml(w.name)} (@${escapeHtml(w.username)})</option>`).join('');
+    
+  await renderTeamMembersList(teamId);
+}
+function closeTeamMembersModal() {
+  document.getElementById('teamMembersModal').style.display = 'none';
+  currentTeamIdForMembers = null;
+}
+
+async function renderTeamMembersList(teamId) {
+  const list = document.getElementById('teamMembersList');
+  list.innerHTML = '<p style="text-align:center; padding:10px;">Loading members...</p>';
+  try {
+    const res = await fetch(`${API}/api/admin/teams/${teamId}/members`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
+    if (!res.ok) throw new Error('Failed to load members');
+    const members = await res.json();
+    
+    if (!members.length) {
+      list.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No members in this team.</p>';
+      return;
+    }
+    
+    list.innerHTML = members.map(m => `
+      <div style="border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; background: white; margin-bottom: 8px;">
+        <div>
+          <p style="font-weight: 600; margin: 0;">${escapeHtml(m.name)} <span style="font-weight: normal; color: #666;">(@${escapeHtml(m.username)})</span></p>
+          ${!m.is_active ? '<span class="status-badge status-assigned" style="font-size:10px; margin-top:4px; display:inline-block;">Inactive Worker</span>' : ''}
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeWorkerFromTeam(${teamId}, ${m.id})">Remove</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    list.innerHTML = `<p style="color:red; text-align:center;">${err.message}</p>`;
+  }
+}
+
+async function addWorkerToTeam() {
+  const worker_id = document.getElementById('workerSelect').value;
+  if (!worker_id) { showToast('Select a worker first.', 'error'); return; }
+  
+  try {
+    const res = await fetch(`${API}/api/admin/teams/${currentTeamIdForMembers}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({ worker_id })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast('Worker added to team!');
+    await renderTeamMembersList(currentTeamIdForMembers);
+    document.getElementById('workerSelect').value = '';
+  } catch (err) {
+    showToast(err.message || 'Failed to add worker.', 'error');
+  }
+}
+
+async function removeWorkerFromTeam(teamId, workerId) {
+  try {
+    const res = await fetch(`${API}/api/admin/teams/${teamId}/members/${workerId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    if (!res.ok) throw new Error('Failed to remove worker');
+    showToast('Worker removed from team!');
+    await renderTeamMembersList(teamId);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
 
 // --- Search Debounce ---
 function debounceSearch() {
@@ -651,6 +917,166 @@ async function toggleWorker(id, isActive) {
     renderWorkersList();
     loadComplaints(); // refresh dropdowns
   } catch (err) { showToast(err.message, 'error'); }
+}
+
+// --- Pending Reports ---
+let pendingReportsData = [];
+
+async function loadPendingReports() {
+  const list = document.getElementById('pendingReportsList');
+  const section = document.getElementById('pendingVerificationSection');
+  if (!list || !section) return;
+
+  try {
+    const res = await fetch(`${API}/api/admin/reports/pending`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) adminLogout();
+      return;
+    }
+    const reports = await res.json();
+    pendingReportsData = reports;
+
+    if (reports.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+    list.innerHTML = reports.map(r => `
+      <div class="complaint-card" style="border-left: 4px solid #f57c00;">
+        <div class="complaint-card-header">
+          <div>
+            <span class="complaint-card-id">${escapeHtml(r.complaint_ref)}</span>
+            <span class="status-badge" style="background:#fff3e0; color:#e65100;">Pending Verification</span>
+          </div>
+          <span class="complaint-card-date">${formatDate(r.created_at)}</span>
+        </div>
+        <div class="complaint-card-body">
+          <div class="complaint-card-details">
+            <p><strong>Category:</strong> ${escapeHtml(r.category || 'Other')}</p>
+            <p><strong>Location:</strong> ${escapeHtml(r.location || 'Unknown')}</p>
+            <p><strong>Team:</strong> ${escapeHtml(r.team_name || 'None')}</p>
+            <p><strong>Assigned:</strong> ${escapeHtml(r.assigned_workers || 'None')}</p>
+            <hr style="margin: 8px 0; border: 0; border-top: 1px solid #eee;" />
+            <p><strong>Submitted by:</strong> ${escapeHtml(r.worker_name)}</p>
+            <p><strong>Notes:</strong> ${escapeHtml(r.notes)}</p>
+          </div>
+          <div class="complaint-card-image" style="cursor:pointer;" onclick="openVerifyModal(${r.complaint_id})">
+             ${r.image_path ? `<img src="${r.image_path.startsWith('http') ? r.image_path : `${API}/${r.image_path}`}" alt="Completion Photo">` : '<div style="padding:40px; background:#f5f5f5; text-align:center; color:#999;"><span class="material-icons-round" style="font-size:32px;">hide_image</span><br>No Photo</div>'}
+          </div>
+        </div>
+        <div style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
+          <button class="btn btn-primary" onclick="openVerifyModal(${r.complaint_id})">
+            <span class="material-icons-round">fact_check</span> Verify Report
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+  } catch (err) {
+    console.error(err);
+    list.innerHTML = '<p class="error-text" style="text-align:center;">Failed to load pending reports.</p>';
+  }
+}
+
+let currentVerifyAction = 'Approve';
+
+function openVerifyModal(complaintId) {
+  const report = pendingReportsData.find(r => r.complaint_id === complaintId);
+  if (!report) return;
+  
+  document.getElementById('verifyComplaintId').value = complaintId;
+  const details = document.getElementById('verifyReportDetails');
+  
+  details.innerHTML = `
+    <div style="margin-bottom: 1rem;">
+      <p style="margin:0;"><strong>Report for ${escapeHtml(report.complaint_ref)}</strong></p>
+      <p style="margin:4px 0 0 0; font-size:0.9rem; color:#666;">Submitted by ${escapeHtml(report.worker_name)} at ${formatDate(report.created_at)}</p>
+    </div>
+    <div style="background:#f9f9f9; padding:12px; border-radius:8px; margin-bottom:1rem;">
+      <p style="margin:0;"><strong>Notes:</strong> ${escapeHtml(report.notes)}</p>
+    </div>
+    <div style="text-align:center; max-height:300px; overflow:hidden; border-radius:8px; background:#000;">
+       ${report.image_path ? `<img src="${report.image_path.startsWith('http') ? report.image_path : `${API}/${report.image_path}`}" alt="Completion Photo" style="max-width:100%; max-height:300px; object-fit:contain;">` : '<p style="color:#fff; padding:20px;">No photo attached</p>'}
+    </div>
+  `;
+  
+  document.getElementById('rejectionReason').value = '';
+  document.getElementById('rejectionReasonGroup').style.display = 'none';
+  const btn = document.getElementById('approveBtn');
+  btn.textContent = 'Approve Work';
+  btn.className = 'btn btn-primary';
+  currentVerifyAction = 'Approve';
+  
+  document.getElementById('verifyReportModal').style.display = 'block';
+}
+
+function closeVerifyModal() {
+  document.getElementById('verifyReportModal').style.display = 'none';
+}
+
+function toggleRejectionReason() {
+  const group = document.getElementById('rejectionReasonGroup');
+  const btn = document.getElementById('approveBtn');
+  
+  if (currentVerifyAction === 'Approve') {
+    group.style.display = 'block';
+    btn.textContent = 'Confirm Rejection';
+    btn.className = 'btn btn-danger';
+    currentVerifyAction = 'Reject';
+  } else {
+    group.style.display = 'none';
+    btn.textContent = 'Approve Work';
+    btn.className = 'btn btn-primary';
+    currentVerifyAction = 'Approve';
+  }
+}
+
+async function submitVerification(e) {
+  e.preventDefault();
+  
+  const complaintId = document.getElementById('verifyComplaintId').value;
+  const reason = document.getElementById('rejectionReason').value;
+  
+  if (currentVerifyAction === 'Reject' && !reason.trim()) {
+    showToast('A rejection reason is required.', 'error');
+    return;
+  }
+  
+  const btn = document.getElementById('approveBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+  
+  try {
+    const res = await fetch(`${API}/api/admin/complaints/${complaintId}/verify`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        action: currentVerifyAction,
+        reason: currentVerifyAction === 'Reject' ? reason : undefined
+      })
+    });
+    
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Verification failed');
+    
+    showToast(`Work ${currentVerifyAction === 'Approve' ? 'Approved' : 'Rejected'} successfully!`, 'success');
+    closeVerifyModal();
+    loadPendingReports();
+    loadComplaints();
+    loadStats();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 // --- Init ---
