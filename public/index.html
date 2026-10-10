@@ -424,7 +424,7 @@
       </div>
       
       <!-- Delete Complaint Modal -->
-      <div id="deleteComplaintModal" class="modal" style="display:none;">
+      <div id="deleteComplaintModal" class="modal" style="display:none;" onclick="if(event.target === this) closeDeleteModal()">
         <div class="modal-content form-card">
           <div class="modal-header">
             <h2>Delete Complaint</h2>

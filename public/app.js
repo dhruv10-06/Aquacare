@@ -914,6 +914,8 @@ async function deleteComplaint(id) {
   const errorDiv = document.getElementById('deleteError');
   const btn = document.getElementById('confirmDeleteBtn');
   btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Deleting...';
   
   try {
     const res = await fetch(`${API}/api/admin/complaints/${id}`, {
@@ -930,13 +932,21 @@ async function deleteComplaint(id) {
     showToast('Complaint deleted successfully!', 'success');
     loadStats();
     loadComplaints();
+    if (typeof loadPendingReports === 'function') {
+      loadPendingReports();
+    }
   } catch (err) {
     errorDiv.textContent = err.message || 'Failed to delete complaint.';
     errorDiv.style.display = 'block';
   } finally {
     btn.disabled = false;
+    btn.textContent = originalText;
   }
 }
+
+window.confirmDeleteComplaint = confirmDeleteComplaint;
+window.closeDeleteModal = closeDeleteModal;
+window.deleteComplaint = deleteComplaint;
 
 // --- Teams Directory ---
 async function fetchTeams() {

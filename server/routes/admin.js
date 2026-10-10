@@ -329,10 +329,13 @@ module.exports = function (db) {
         return res.status(404).json({ error: 'Complaint not found.' });
       }
 
-      await db.execute({
-        sql: 'DELETE FROM complaints WHERE id = ?',
-        args: [id]
-      });
+      // Delete dependent records first to satisfy foreign key constraints
+      await db.batch([
+        { sql: 'DELETE FROM complaint_workers WHERE complaint_id = ?', args: [id] },
+        { sql: 'DELETE FROM work_reports WHERE complaint_id = ?', args: [id] },
+        { sql: 'DELETE FROM status_history WHERE complaint_id = ?', args: [id] },
+        { sql: 'DELETE FROM complaints WHERE id = ?', args: [id] }
+      ], 'write');
 
       res.json({ message: 'Complaint deleted successfully.' });
     } catch (err) {
