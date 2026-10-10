@@ -100,10 +100,10 @@ module.exports = function (db) {
       }
 
       // Prevent mixing new vs legacy models
-      const hasNewModel = (team_id !== undefined || worker_ids !== undefined);
+      const hasNewModel = (team_id !== undefined || worker_ids !== undefined || leader_id !== undefined);
       const hasLegacyModel = (assigned_team !== undefined || worker_id !== undefined);
       if (hasNewModel && hasLegacyModel) {
-        return res.status(400).json({ error: 'Cannot mix new assignment model (team_id/worker_ids) with legacy model (assigned_team/worker_id).' });
+        return res.status(400).json({ error: 'Cannot mix new assignment model (team_id/worker_ids/leader_id) with legacy model (assigned_team/worker_id).' });
       }
 
       let newTeamId = complaint.team_id;
@@ -113,7 +113,37 @@ module.exports = function (db) {
       // Statements array for the atomic batch write
       const statements = [];
 
-      // 1. Process Team Assignment
+      // 1. Process Status Change & Validate Allowed Transitions
+      let newStatus = complaint.status;
+      if (status !== undefined) {
+        const ALLOWED_STATUSES = ['Submitted', 'Assigned', 'In Progress', 'Awaiting Admin Verification', 'Resolved'];
+        if (!ALLOWED_STATUSES.includes(status)) {
+          return res.status(400).json({ error: `Invalid status. Must be one of: ${ALLOWED_STATUSES.join(', ')}` });
+        }
+        if (complaint.status === 'Resolved' && status !== 'Resolved') {
+          return res.status(400).json({ error: 'Cannot change status of a Resolved complaint.' });
+        }
+        if (status === 'Resolved' && complaint.status !== 'Resolved') {
+          return res.status(400).json({ error: 'Complaints can only be resolved via report approval.' });
+        }
+        if (status === 'Awaiting Admin Verification' && complaint.status !== 'Awaiting Admin Verification') {
+          return res.status(400).json({ error: 'Status can only transition to Awaiting Admin Verification via worker report submission.' });
+        }
+
+        const allowedTransitions = {
+          'Submitted': ['Assigned'],
+          'Assigned': ['In Progress', 'Submitted'],
+          'In Progress': ['Assigned'],
+          'Awaiting Admin Verification': ['In Progress'],
+          'Resolved': []
+        };
+        if (status !== complaint.status && (!allowedTransitions[complaint.status] || !allowedTransitions[complaint.status].includes(status))) {
+          return res.status(400).json({ error: `Invalid status transition from ${complaint.status} to ${status}.` });
+        }
+        newStatus = status;
+      }
+
+      // 2. Process Team Assignment
       if (team_id !== undefined) {
         if (team_id === null || team_id === '') {
           newTeamId = null;
@@ -141,7 +171,12 @@ module.exports = function (db) {
         newAssignedTeam = assigned_team;
       }
 
-      // 2. Process Worker Assignments
+      // Auto-transition newly Submitted complaints to Assigned upon valid team assignment
+      if (complaint.status === 'Submitted' && newTeamId && status === undefined) {
+        newStatus = 'Assigned';
+      }
+
+      // 3. Process Worker Assignments
       if (worker_ids !== undefined) {
         if (!Array.isArray(worker_ids)) return res.status(400).json({ error: 'worker_ids must be an array.' });
         
@@ -197,8 +232,13 @@ module.exports = function (db) {
           statements.push({ sql: 'INSERT INTO complaint_workers (complaint_id, worker_id) VALUES (?, ?)', args: [id, worker.id] });
         }
       }
-      // 2.5 Process Leader ID
+
+      // 4. Process Leader ID
       let newLeaderId = complaint.leader_id;
+      // If team changed and leader_id was not provided, clear old leader to prevent stale assignments
+      if (complaint.team_id !== newTeamId && leader_id === undefined) {
+        newLeaderId = null;
+      }
       if (leader_id !== undefined) {
         if (leader_id === null || leader_id === '') {
           newLeaderId = null;
@@ -222,7 +262,7 @@ module.exports = function (db) {
         }
       }
 
-      // 3. Process Deadline
+      // 5. Process Deadline
       let newDeadline = complaint.deadline;
       if (deadline !== undefined) {
         if (deadline === null || deadline === '') {
@@ -237,9 +277,6 @@ module.exports = function (db) {
         }
       }
 
-      // 4. Process Status
-      const newStatus = status || complaint.status;
-
       // Add the final update statement
       statements.push({
         sql: `UPDATE complaints SET status = ?, assigned_team = ?, worker_id = ?, deadline = ?, team_id = ?, leader_id = ?, status_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
@@ -249,7 +286,7 @@ module.exports = function (db) {
       if (newStatus !== complaint.status) {
         statements.push({
           sql: `INSERT INTO status_history (complaint_id, status, notes) VALUES (?, ?, ?)`,
-          args: [id, newStatus, 'Status updated by administrator.']
+          args: [id, newStatus, `Status updated to ${newStatus} by administrator.`]
         });
       }
 
@@ -261,6 +298,9 @@ module.exports = function (db) {
 
     } catch (err) {
       console.error('Error updating complaint:', err);
+      if (err.message && err.message.includes('leader_id')) {
+        return res.status(500).json({ error: 'Database schema missing leader_id column. A database migration is required.' });
+      }
       res.status(500).json({ error: 'Failed to update complaint.' });
     }
   });

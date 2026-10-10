@@ -75,8 +75,28 @@ module.exports = function (db) {
         ORDER BY c.created_at DESC
       `;
       
-      const result = await db.execute({ sql: query, args: [workerId] });
-      const complaints = result.rows;
+      let complaints;
+      try {
+        const result = await db.execute({ sql: query, args: [workerId] });
+        complaints = result.rows;
+      } catch (qErr) {
+        if (qErr.message && qErr.message.includes('leader_id')) {
+          const fallbackQuery = `
+            SELECT c.id, c.complaint_id, c.category, c.description, c.location, 
+                   c.status, c.assigned_team, c.deadline, c.created_at, c.updated_at
+            FROM complaints c
+            JOIN teams t ON c.team_id = t.id
+            JOIN team_memberships tm ON t.id = tm.team_id
+            WHERE tm.worker_id = ? AND t.is_active = 1
+            ORDER BY c.created_at DESC
+          `;
+          const result = await db.execute({ sql: fallbackQuery, args: [workerId] });
+          complaints = result.rows;
+          complaints.forEach(c => { c.leader_id = null; });
+        } else {
+          throw qErr;
+        }
+      }
 
       // Attach worker_ids from complaint_workers so the frontend knows if they are personally assigned
       // We only fetch for the complaints returned above to optimize
@@ -212,14 +232,6 @@ module.exports = function (db) {
       const { notes } = req.body;
       const imagePath = req.file ? req.file.path : null;
 
-      if (!notes) {
-        cleanupUpload();
-        return res.status(400).json({ error: 'Completion notes are required.' });
-      }
-      if (!imagePath) {
-        return res.status(400).json({ error: 'Evidence photo is required.' });
-      }
-
       // 1. Complaint must exist
       const cRes = await db.execute({
         sql: 'SELECT * FROM complaints WHERE id = ?',
@@ -241,6 +253,14 @@ module.exports = function (db) {
       if (!complaint.team_id) {
          cleanupUpload();
          return res.status(403).json({ error: 'This task is not assigned to a team.' });
+      }
+
+      if (!notes) {
+        cleanupUpload();
+        return res.status(400).json({ error: 'Completion notes are required.' });
+      }
+      if (!imagePath) {
+        return res.status(400).json({ error: 'Evidence photo is required.' });
       }
       
       const teamRes = await db.execute({

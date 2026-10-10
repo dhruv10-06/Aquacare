@@ -470,6 +470,9 @@ function renderComplaintCard(c) {
   
   const legacyTeam = (c.assigned_team && !c.team_id && !c.worker_id && !c.leader_id) ? `<small style="color:#666; margin-left:8px;">Legacy Team: ${escapeHtml(c.assigned_team)}</small>` : '';
 
+  const leaderWorker = allWorkers.find(w => String(w.id) === String(c.leader_id));
+  const leaderDetail = leaderWorker ? `<p><strong>Team Leader:</strong> <span class="status-badge" style="background:#e3f2fd; color:#1976d2;">${escapeHtml(leaderWorker.name)}</span></p>` : '';
+
   return `
     <div class="complaint-card" id="card-${c.id}">
       <div class="complaint-card-header">
@@ -487,7 +490,8 @@ function renderComplaintCard(c) {
           <p><strong>Category:</strong> ${escapeHtml(c.category || 'Other')}</p>
           <p><strong>Location:</strong> ${escapeHtml(c.location)}</p>
           <p><strong>Description:</strong> ${escapeHtml(c.description)}</p>
-          ${c.assigned_team ? `<p><strong>Team/Worker:</strong> ${escapeHtml(c.assigned_team)}</p>` : ''}
+          ${c.assigned_team ? `<p><strong>Team:</strong> ${escapeHtml(c.assigned_team)}</p>` : ''}
+          ${leaderDetail}
           ${c.deadline ? `<p><strong>Deadline:</strong> ${escapeHtml(c.deadline)}</p>` : ''}
         </div>
         ${imageHtml}
@@ -505,12 +509,15 @@ function renderComplaintCard(c) {
             ${teamOptions}
           </select>
         </div>
-        <div style="display:flex; align-items:start; gap:4px;">
-          <label>Team Leader:</label>
-          <select id="leader-${c.id}" style="width: 140px;">
-            <option value="">No leader</option>
-            ${workerOptions}
-          </select>
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <label>Team Leader:</label>
+            <select id="leader-${c.id}" style="width: 140px;" title="All active team members can work on this task, but only the designated leader can submit the final report.">
+              <option value="">No leader</option>
+              ${workerOptions}
+            </select>
+          </div>
+          <small style="color:#666; font-size:0.75rem;">All team members can work; only leader submits report.</small>
         </div>
         ${legacyTeam}
         <div style="display:flex; align-items:center; gap:4px;">
@@ -540,9 +547,12 @@ function getWorkerOptionsForTeam(teamId, assignedLeaderId = null) {
   
   let options = '';
   workers.forEach(w => {
-    if (w.is_active || w.id === assignedLeaderId) {
-      const isSelected = w.id === assignedLeaderId ? 'selected' : '';
-      options += `<option value="${w.id}" ${isSelected}>${escapeHtml(w.name)}</option>`;
+    const isCurrentLeader = (assignedLeaderId != null && String(w.id) === String(assignedLeaderId));
+    if (w.is_active || isCurrentLeader) {
+      const isSelected = isCurrentLeader ? 'selected' : '';
+      const disabledAttr = !w.is_active ? 'disabled' : '';
+      const inactiveLabel = !w.is_active ? ' (Inactive)' : '';
+      options += `<option value="${w.id}" ${isSelected} ${disabledAttr}>${escapeHtml(w.name)}${inactiveLabel}</option>`;
     }
   });
   return options;
@@ -558,7 +568,7 @@ async function saveComplaintAssignment(id, currentStatus) {
   const leaderSelect = document.getElementById(`leader-${id}`);
   
   const team_id = teamEl.value ? parseInt(teamEl.value) : null;
-  const leader_id = leaderSelect.value ? parseInt(leaderSelect.value) : null;
+  const leader_id = (leaderSelect && leaderSelect.value) ? parseInt(leaderSelect.value) : null;
   const deadline = document.getElementById(`deadline-${id}`).value;
   
   let status = undefined;

@@ -99,6 +99,12 @@ async function loadWorkerTasks() {
       return;
     }
     
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      listDiv.innerHTML = `<p style="color:red; text-align:center;">Failed to load tasks: ${escapeHtml(errData.error || res.statusText)}</p>`;
+      return;
+    }
+    
     const tasks = await res.json();
     
     let personalCount = 0;
