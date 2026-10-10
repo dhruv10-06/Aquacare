@@ -113,7 +113,7 @@ module.exports = function (db) {
 
         complaints.forEach(c => {
           const assignedIds = cwMap[c.id] || [];
-          c.is_personally_assigned = assignedIds.includes(workerId);
+          c.is_personally_assigned = assignedIds.some(id => String(id) === String(workerId));
           c.responsible_workers = assignedIds.map(id => workerNames[id] || 'Unknown').join(', ');
           
           if (c.status === 'In Progress' && rMap[c.id]) {
