@@ -41,6 +41,35 @@ async function initializeDatabase() {
     await db.execute("ALTER TABLE complaints ADD COLUMN category TEXT DEFAULT 'Other'");
   }
 
+  const hasWorkerId = tableInfo.rows.some(row => row.name === 'worker_id');
+  if (!hasWorkerId) {
+    await db.execute('ALTER TABLE complaints ADD COLUMN worker_id INTEGER REFERENCES workers(id)');
+  }
+
+  const hasDeadline = tableInfo.rows.some(row => row.name === 'deadline');
+  if (!hasDeadline) {
+    await db.execute('ALTER TABLE complaints ADD COLUMN deadline TEXT');
+  }
+
+  const hasLegacyTeam = tableInfo.rows.some(row => row.name === 'legacy_assigned_team');
+  if (!hasLegacyTeam) {
+    await db.execute('ALTER TABLE complaints ADD COLUMN legacy_assigned_team TEXT');
+    // Migrate existing assigned_team values into legacy_assigned_team where worker_id is null
+    await db.execute('UPDATE complaints SET legacy_assigned_team = assigned_team WHERE assigned_team IS NOT NULL AND worker_id IS NULL');
+  }
+
+  // Create workers table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS workers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1
+    )
+  `);
+
   // Create admins table
   await db.execute(`
     CREATE TABLE IF NOT EXISTS admins (

@@ -74,7 +74,7 @@ module.exports = function (db) {
   // PATCH /api/admin/complaints/:id — Update complaint status/assignment
   router.patch('/complaints/:id', authenticateAdmin, async (req, res) => {
     try {
-      const { status, assigned_team } = req.body;
+      const { status, assigned_team, worker_id, deadline } = req.body;
       const { id } = req.params;
 
       const result = await db.execute({
@@ -87,12 +87,52 @@ module.exports = function (db) {
         return res.status(404).json({ error: 'Complaint not found.' });
       }
 
+      let newWorkerId = complaint.worker_id;
+      let newTeam = assigned_team !== undefined ? assigned_team : complaint.assigned_team;
+
+      if (worker_id !== undefined) {
+        if (worker_id === null || worker_id === '') {
+          newWorkerId = null;
+          // Restore legacy team if it exists
+          newTeam = complaint.legacy_assigned_team || null;
+        } else {
+          const workerRes = await db.execute({
+            sql: 'SELECT * FROM workers WHERE id = ?',
+            args: [worker_id]
+          });
+          const worker = workerRes.rows[0];
+          if (!worker) {
+            return res.status(400).json({ error: 'Invalid worker ID.' });
+          }
+          if (worker.is_active === 0) {
+            return res.status(400).json({ error: 'Cannot assign to an inactive worker.' });
+          }
+          newWorkerId = worker.id;
+          newTeam = worker.name;
+        }
+      }
+
+      let newDeadline = complaint.deadline;
+      if (deadline !== undefined) {
+        if (deadline === null || deadline === '') {
+          newDeadline = null;
+        } else {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
+            return res.status(400).json({ error: 'Deadline must be in YYYY-MM-DD format.' });
+          }
+          const dateObj = new Date(deadline);
+          if (isNaN(dateObj.getTime()) || deadline !== dateObj.toISOString().split('T')[0]) {
+            return res.status(400).json({ error: 'Invalid calendar date.' });
+          }
+          newDeadline = deadline;
+        }
+      }
+
       const newStatus = status || complaint.status;
-      const newTeam = assigned_team !== undefined ? assigned_team : complaint.assigned_team;
 
       await db.execute({
-        sql: `UPDATE complaints SET status = ?, assigned_team = ?, updated_at = datetime('now') WHERE id = ?`,
-        args: [newStatus, newTeam, id]
+        sql: `UPDATE complaints SET status = ?, assigned_team = ?, worker_id = ?, deadline = ?, updated_at = datetime('now') WHERE id = ?`,
+        args: [newStatus, newTeam, newWorkerId, newDeadline, id]
       });
 
       const updatedResult = await db.execute({
@@ -190,6 +230,71 @@ module.exports = function (db) {
     } catch (err) {
       console.error('Change password error:', err);
       res.status(500).json({ error: 'Failed to change password.' });
+    }
+  });
+
+  // --- PHASE 2 WORKER ENDPOINTS ---
+
+  // GET /api/admin/workers — List all workers
+  router.get('/workers', authenticateAdmin, async (req, res) => {
+    try {
+      const result = await db.execute('SELECT id, username, name, phone, is_active FROM workers');
+      res.json(result.rows);
+    } catch (err) {
+      console.error('Error fetching workers:', err);
+      res.status(500).json({ error: 'Failed to fetch workers.' });
+    }
+  });
+
+  // POST /api/admin/workers — Create a new worker
+  router.post('/workers', authenticateAdmin, async (req, res) => {
+    try {
+      const { name, phone, username, password } = req.body;
+      if (!name || !phone || !username || !password) {
+        return res.status(400).json({ error: 'Name, phone, username, and password are required.' });
+      }
+      if (!/^\d{10}$/.test(phone)) {
+        return res.status(400).json({ error: 'Mobile number must be exactly 10 digits.' });
+      }
+
+      const hash = bcrypt.hashSync(password, 10);
+
+      try {
+        await db.execute({
+          sql: 'INSERT INTO workers (username, password_hash, name, phone, is_active) VALUES (?, ?, ?, ?, 1)',
+          args: [username, hash, name, phone]
+        });
+        res.status(201).json({ message: 'Worker created successfully' });
+      } catch (dbErr) {
+        if (dbErr.message.includes('UNIQUE constraint failed')) {
+          return res.status(400).json({ error: 'Username already exists.' });
+        }
+        throw dbErr;
+      }
+    } catch (err) {
+      console.error('Error creating worker:', err);
+      res.status(500).json({ error: 'Failed to create worker.' });
+    }
+  });
+
+  // PATCH /api/admin/workers/:id — Toggle active status
+  router.patch('/workers/:id', authenticateAdmin, async (req, res) => {
+    try {
+      const { is_active } = req.body;
+      const { id } = req.params;
+
+      if (is_active === undefined) {
+        return res.status(400).json({ error: 'is_active field is required.' });
+      }
+
+      await db.execute({
+        sql: 'UPDATE workers SET is_active = ? WHERE id = ?',
+        args: [is_active ? 1 : 0, id]
+      });
+      res.json({ message: 'Worker status updated successfully' });
+    } catch (err) {
+      console.error('Error updating worker status:', err);
+      res.status(500).json({ error: 'Failed to update worker status.' });
     }
   });
 

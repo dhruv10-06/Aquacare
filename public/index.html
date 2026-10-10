@@ -294,7 +294,10 @@
           <p>Manage and resolve water leakage complaints</p>
         </div>
         <div>
-          <button class="btn btn-outline btn-sm" onclick="showChangePasswordModal()">
+          <button class="btn btn-outline btn-sm" onclick="showWorkersModal()">
+            <span class="material-icons-round">engineering</span> Manage Workers
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="showChangePasswordModal()" style="margin-left: 8px;">
             <span class="material-icons-round">vpn_key</span> Change Password
           </button>
           <button class="btn btn-outline btn-sm" onclick="adminLogout()" style="margin-left: 8px;">
@@ -328,6 +331,31 @@
               Update Password
             </button>
           </form>
+        </div>
+      </div>
+      
+      <!-- Workers Modal -->
+      <div id="workersModal" class="modal" style="display:none;">
+        <div class="modal-content form-card" style="max-width: 600px;">
+          <div class="modal-header">
+            <h2>Maintenance Directory</h2>
+            <span class="close-modal" onclick="closeWorkersModal()">&times;</span>
+          </div>
+          
+          <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-color); border-radius: 8px;">
+            <h3 style="font-size: 1rem; margin-bottom: 12px;">Add New Worker</h3>
+            <form onsubmit="createWorker(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <input type="text" id="wName" placeholder="Full Name" required>
+              <input type="tel" id="wPhone" placeholder="10-digit Phone" pattern="\d{10}" required>
+              <input type="text" id="wUsername" placeholder="Username" required>
+              <input type="password" id="wPassword" placeholder="Password" required>
+              <button type="submit" class="btn btn-primary" style="grid-column: span 2;">Add Worker</button>
+            </form>
+          </div>
+          
+          <div id="workersList" style="display: flex; flex-direction: column; gap: 12px; max-height: 300px; overflow-y: auto;">
+            <!-- Render workers here -->
+          </div>
         </div>
       </div>
       

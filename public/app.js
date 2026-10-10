@@ -9,6 +9,7 @@ let currentPage = 'home';
 let adminToken = sessionStorage.getItem('aquacare_token') || null;
 let lastComplaintId = null;
 let searchTimeout = null;
+let allWorkers = [];
 
 // --- Navigation ---
 function navigateTo(page) {
@@ -368,6 +369,8 @@ async function loadComplaints() {
 
     if (res.status === 401) { adminLogout(); return; }
     const complaints = await res.json();
+    
+    await fetchWorkers(); // Ensure workers are loaded before rendering
 
     if (complaints.length === 0) {
       listDiv.innerHTML = `<div class="empty-state"><span class="material-icons-round">inbox</span><p>No complaints found.</p></div>`;
@@ -389,12 +392,36 @@ function renderComplaintCard(c) {
     ? `<img class="complaint-card-image" src="${c.image_path}" alt="Complaint photo" onclick="window.open('${c.image_path}', '_blank')">`
     : '';
 
+  let isOverdue = false;
+  if (c.deadline && c.status !== 'Resolved') {
+    const todayDate = new Date();
+    // Create local YYYY-MM-DD string
+    const yyyy = todayDate.getFullYear();
+    const mm = String(todayDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(todayDate.getDate()).padStart(2, '0');
+    const todayLocalStr = `${yyyy}-${mm}-${dd}`;
+    
+    // Strict string comparison (YYYY-MM-DD format allows alphabetical comparison)
+    if (todayLocalStr > c.deadline) {
+      isOverdue = true;
+    }
+  }
+  const overdueBadge = isOverdue ? `<span class="status-badge" style="background:#ffebee; color:#d32f2f;">[OVERDUE]</span>` : '';
+
+  let workerOptions = `<option value="">Unassigned</option>`;
+  allWorkers.filter(w => w.is_active || w.id === c.worker_id).forEach(w => {
+    workerOptions += `<option value="${w.id}" ${w.id === c.worker_id ? 'selected' : ''}>${escapeHtml(w.name)}</option>`;
+  });
+  
+  const legacyTeam = (c.assigned_team && !c.worker_id) ? `<small style="color:#666; margin-left:8px;">Legacy Team: ${escapeHtml(c.assigned_team)}</small>` : '';
+
   return `
     <div class="complaint-card" id="card-${c.id}">
       <div class="complaint-card-header">
         <div>
           <span class="complaint-card-id">${c.complaint_id}</span>
           <span class="status-badge ${getStatusClass(c.status)}">${c.status}</span>
+          ${overdueBadge}
         </div>
         <span class="complaint-card-date">${formatDate(c.created_at)}</span>
       </div>
@@ -405,18 +432,24 @@ function renderComplaintCard(c) {
           <p><strong>Category:</strong> ${escapeHtml(c.category || 'Other')}</p>
           <p><strong>Location:</strong> ${escapeHtml(c.location)}</p>
           <p><strong>Description:</strong> ${escapeHtml(c.description)}</p>
-          ${c.assigned_team ? `<p><strong>Team:</strong> ${escapeHtml(c.assigned_team)}</p>` : ''}
+          ${c.assigned_team ? `<p><strong>Team/Worker:</strong> ${escapeHtml(c.assigned_team)}</p>` : ''}
+          ${c.deadline ? `<p><strong>Deadline:</strong> ${escapeHtml(c.deadline)}</p>` : ''}
         </div>
         ${imageHtml}
       </div>
       <div class="complaint-card-actions">
         <label>Status:</label>
-        <select onchange="updateComplaint(${c.id}, this.value, null)" id="status-${c.id}">
+        <select onchange="updateComplaint(${c.id}, this.value, null, null)" id="status-${c.id}">
           ${statusOptions}
         </select>
-        <label>Team:</label>
-        <input type="text" placeholder="Assign team..." value="${c.assigned_team || ''}" id="team-${c.id}" style="width: 160px;">
-        <button class="btn btn-primary btn-sm" onclick="updateComplaint(${c.id}, null, document.getElementById('team-${c.id}').value)">
+        <label style="margin-left:8px;">Worker:</label>
+        <select id="worker-${c.id}" style="width: 140px;">
+          ${workerOptions}
+        </select>
+        ${legacyTeam}
+        <label style="margin-left:8px;">Deadline:</label>
+        <input type="date" id="deadline-${c.id}" value="${c.deadline || ''}" style="width: 125px;">
+        <button class="btn btn-primary btn-sm" onclick="updateComplaint(${c.id}, null, document.getElementById('worker-${c.id}').value, document.getElementById('deadline-${c.id}').value)" style="margin-left:8px;">
           <span class="material-icons-round" style="font-size:16px;">save</span> Save
         </button>
         <button class="btn btn-danger btn-sm" onclick="confirmDeleteComplaint(${c.id})" style="margin-left:auto;">
@@ -428,10 +461,11 @@ function renderComplaintCard(c) {
 }
 
 // --- Dashboard: Update Complaint ---
-async function updateComplaint(id, status, team) {
+async function updateComplaint(id, status, worker_id, deadline) {
   const body = {};
   if (status) body.status = status;
-  if (team !== null) body.assigned_team = team;
+  if (worker_id !== null) body.worker_id = worker_id;
+  if (deadline !== null) body.deadline = deadline;
 
   try {
     const res = await fetch(`${API}/api/admin/complaints/${id}`, {
@@ -542,6 +576,81 @@ function showToast(message, type = 'success') {
   toast.textContent = message;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
+}
+
+// --- Workers Directory ---
+async function fetchWorkers() {
+  if (!adminToken) return;
+  try {
+    const res = await fetch(`${API}/api/admin/workers`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
+    if (res.ok) allWorkers = await res.json();
+  } catch (err) { console.error(err); }
+}
+
+function showWorkersModal() {
+  document.getElementById('workersModal').style.display = 'flex';
+  renderWorkersList();
+}
+function closeWorkersModal() { 
+  document.getElementById('workersModal').style.display = 'none'; 
+}
+
+function renderWorkersList() {
+  const list = document.getElementById('workersList');
+  if (!allWorkers.length) { list.innerHTML = '<p style="text-align:center; padding:20px; color:#666;">No workers found.</p>'; return; }
+  list.innerHTML = allWorkers.map(w => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; border:1px solid #ddd; border-radius:8px;">
+      <div>
+        <strong>${escapeHtml(w.name)}</strong> (@${escapeHtml(w.username)})<br>
+        <small>📞 ${escapeHtml(w.phone)} ${!w.is_active ? '<span style="color:#d32f2f; margin-left:4px;">(Inactive)</span>' : ''}</small>
+      </div>
+      <button class="btn btn-sm ${w.is_active ? 'btn-outline' : 'btn-primary'}" onclick="toggleWorker(${w.id}, ${!w.is_active})">
+        ${w.is_active ? 'Deactivate' : 'Activate'}
+      </button>
+    </div>
+  `).join('');
+}
+
+async function createWorker(e) {
+  e.preventDefault();
+  const name = document.getElementById('wName').value.trim();
+  const phone = document.getElementById('wPhone').value.trim();
+  const username = document.getElementById('wUsername').value.trim();
+  const password = document.getElementById('wPassword').value;
+  
+  if (!/^\d{10}$/.test(phone)) {
+    showToast('Mobile number must be exactly 10 digits.', 'error');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${API}/api/admin/workers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({ name, phone, username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast('Worker created successfully!', 'success');
+    e.target.reset();
+    await fetchWorkers();
+    renderWorkersList();
+    loadComplaints(); // refresh dropdowns
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function toggleWorker(id, isActive) {
+  try {
+    const res = await fetch(`${API}/api/admin/workers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({ is_active: isActive })
+    });
+    if (!res.ok) throw new Error('Failed to update worker status');
+    await fetchWorkers();
+    renderWorkersList();
+    loadComplaints(); // refresh dropdowns
+  } catch (err) { showToast(err.message, 'error'); }
 }
 
 // --- Init ---
