@@ -32,18 +32,29 @@ module.exports = function (db) {
   // POST /api/complaints — Submit a new complaint
   router.post('/', upload.single('image'), async (req, res) => {
     try {
-      const { name, phone, description, location } = req.body;
+      const { name, phone, description, location, category } = req.body;
 
       if (!name || !phone || !description || !location) {
         return res.status(400).json({ error: 'Name, phone, description, and location are required.' });
+      }
+
+      if (!/^\d{10}$/.test(phone)) {
+        return res.status(400).json({ error: 'Mobile number must be exactly 10 digits.' });
+      }
+
+      const allowedCategories = ['Pipeline Leakage', 'Overflowing Water Tank', 'Damaged Public Tap', 'Other'];
+      const complaintCategory = category || 'Other';
+
+      if (!allowedCategories.includes(complaintCategory)) {
+        return res.status(400).json({ error: 'Invalid category selected.' });
       }
 
       const complaintId = 'AQ-' + uuidv4().slice(0, 8).toUpperCase();
       const imagePath = req.file ? req.file.path : null;
 
       await db.execute({
-        sql: `INSERT INTO complaints (complaint_id, name, phone, description, location, image_path) VALUES (?, ?, ?, ?, ?, ?)`,
-        args: [complaintId, name, phone, description, location, imagePath]
+        sql: `INSERT INTO complaints (complaint_id, name, phone, description, location, image_path, category) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [complaintId, name, phone, description, location, imagePath, complaintCategory]
       });
 
       res.status(201).json({

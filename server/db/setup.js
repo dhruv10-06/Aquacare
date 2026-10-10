@@ -34,6 +34,13 @@ async function initializeDatabase() {
     )
   `);
 
+  // Add category column idempotently
+  const tableInfo = await db.execute('PRAGMA table_info(complaints)');
+  const hasCategory = tableInfo.rows.some(row => row.name === 'category');
+  if (!hasCategory) {
+    await db.execute("ALTER TABLE complaints ADD COLUMN category TEXT DEFAULT 'Other'");
+  }
+
   // Create admins table
   await db.execute(`
     CREATE TABLE IF NOT EXISTS admins (

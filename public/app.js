@@ -58,6 +58,12 @@ function closeMobileMenu() {
 // --- Complaint Submission ---
 async function submitComplaint(e) {
   e.preventDefault();
+  const phoneVal = document.getElementById('phone').value.trim();
+  if (!/^\d{10}$/.test(phoneVal)) {
+    showToast('Mobile number must be exactly 10 digits.', 'error');
+    return;
+  }
+
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons-round">hourglass_top</span> Submitting...';
@@ -396,6 +402,7 @@ function renderComplaintCard(c) {
         <div class="complaint-card-details">
           <p><strong>Name:</strong> ${escapeHtml(c.name)}</p>
           <p><strong>Phone:</strong> ${escapeHtml(c.phone)}</p>
+          <p><strong>Category:</strong> ${escapeHtml(c.category || 'Other')}</p>
           <p><strong>Location:</strong> ${escapeHtml(c.location)}</p>
           <p><strong>Description:</strong> ${escapeHtml(c.description)}</p>
           ${c.assigned_team ? `<p><strong>Team:</strong> ${escapeHtml(c.assigned_team)}</p>` : ''}
