@@ -195,3 +195,16 @@ async function initializeDatabase() {
 }
 
 module.exports = { initializeDatabase, getDatabase };
+
+if (require.main === module) {
+  require('dotenv').config();
+  initializeDatabase()
+    .then(() => {
+      console.log('Database initialized successfully.');
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error('Failed to initialize database:', err);
+      process.exit(1);
+    });
+}
